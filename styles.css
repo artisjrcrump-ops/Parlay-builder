@@ -231,3 +231,34 @@ body.sheet-open { overflow: hidden; }
 .log small { color: var(--muted); }
 .log tr.avg td { color: var(--muted); }
 .log tr.pred td { color: var(--accent); font-weight: 700; border-bottom: none; }
+
+.title-actions { display: flex; gap: 6px; }
+
+.log tr.fd td { color: var(--text); font-weight: 700; border-top: 1px solid var(--line); }
+.log tr.edge td { font-size: 12px; border-bottom: none; }
+.log td.up { color: var(--good); }
+.log td.down { color: var(--bad); }
+
+.settings { display: grid; gap: 10px; padding-top: 16px; }
+.settings label { font-weight: 600; }
+.settings input {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 16px;
+}
+.settings-actions { display: flex; gap: 8px; }
+.settings a { color: var(--accent); }
+
+.btn {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 16px;
+  font: inherit;
+  font-weight: 600;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }

@@ -115,6 +115,7 @@ function parseGame(ev, ranks) {
     return {
       id: c.team.id,
       name: c.team.shortDisplayName || c.team.displayName,
+      full: c.team.displayName,
       abbr: c.team.abbreviation,
       logo: c.team.logo,
       record: c.records?.[0]?.summary || "",

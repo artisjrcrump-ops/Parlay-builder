@@ -223,6 +223,34 @@ async function openPlayer(playerId) {
         return `<td>${fmt((0.6 * l5 + 0.4 * season) * factor, s.key)}</td>`;
       }).join("")}</tr>`;
 
+    let lines = null;
+    let linesError = "";
+    try {
+      lines = await getPlayerLines(g, p.name);
+    } catch (err) {
+      linesError = err.message;
+    }
+    if (sheet.game !== g) return;
+    const estimate = (key) => (0.6 * avg(last5, key) + 0.4 * avg(rows, key)) * factor;
+    const fdRow = lines ? `
+      <tr class="fd"><td>FanDuel<br><small>line</small></td>${stats.map((s) => {
+        const l = lines[s.key];
+        return `<td>${l ? `${l.line}<br><small>${l.over ?? ""}/${l.under ?? ""}</small>` : "–"}</td>`;
+      }).join("")}</tr>
+      <tr class="edge"><td>Est. vs line</td>${stats.map((s) => {
+        const l = lines[s.key];
+        if (!l) return "<td></td>";
+        const d = estimate(s.key) - l.line;
+        return `<td class="${d >= 0 ? "up" : "down"}">${d >= 0 ? "+" : ""}${fmt(d, s.key)}</td>`;
+      }).join("")}</tr>` : "";
+    const linesNote = linesError
+      ? `Couldn't load FanDuel lines (${linesError}).`
+      : !lines
+        ? "Add your free SportsGameOdds key in ⚙︎ Settings to see FanDuel lines here."
+        : Object.keys(lines).length
+          ? "FanDuel lines refresh about every 10 minutes."
+          : "FanDuel hasn't posted props for this player yet.";
+
     const oppRank = opp.def ? `${opp.name} defense ranks ${ordinal(opp.def)} of ${opp.n} in points allowed` : `${opp.name}`;
     const adj = Math.round((factor - 1) * 100);
     $("sheet-body").innerHTML = `
@@ -231,10 +259,10 @@ async function openPlayer(playerId) {
       <div class="table-wrap">
         <table class="log">
           <thead><tr><th></th>${head}</tr></thead>
-          <tbody>${gameRows}${avgRow("Last 5", last5)}${avgRow(`Season (${rows.length})`, rows)}${predRow}</tbody>
+          <tbody>${gameRows}${avgRow("Last 5", last5)}${avgRow(`Season (${rows.length})`, rows)}${predRow}${fdRow}</tbody>
         </table>
       </div>
-      <p class="note">Estimate = 60% last 5 + 40% season, scaled for tonight's opponent. FanDuel lines will show here once the odds key is added.</p>`;
+      <p class="note">Estimate = 60% last 5 + 40% season, scaled for this opponent. ${linesNote}</p>`;
   } catch (err) {
     $("sheet-body").innerHTML = `<p class="status">Couldn't load game log (${err.message}).</p>`;
   }
