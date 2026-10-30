@@ -254,14 +254,29 @@ function renderAuto() {
   const modes = AUTO_MODES[sportOf(state.league)];
   const mode = modes.some(([k]) => k === sheet.autoMode) ? sheet.autoMode : "mixed";
   const label = modes.find(([k]) => k === mode)[1];
-  const parlays = mode === "mixed" ? buildParlays(c.cands) : buildStatParlays(c.cands, mode, label);
+  const cands = withoutSaved(c.cands);
+  const parlays = mode === "mixed" ? buildParlays(cands) : buildStatParlays(cands, mode, label);
   renderParlays(parlays, {
     header: `<label class="mode"><span>Build</span><select id="auto-mode">${modes
-      .map(([k, l]) => `<option value="${k}" ${k === mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>`,
+      .map(([k, l]) => `<option value="${k}" ${k === mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>${skippedNote(cands)}`,
     intro: mode === "mixed" ? undefined
       : `Only ${label.toLowerCase()} props. Each pick is checked against how tonight's opponent defends that stat at the player's position, plus recent form, season hit rate and the estimate vs FanDuel's line. No pick appears in more than one parlay.`,
     empty: `Not enough strong ${mode === "mixed" ? "" : `${label.toLowerCase()} `}picks on this slate. Try another prop type, day or league.`,
   });
+}
+
+// Picks already in a saved slip (same game, player and stat, either side) are left out of
+// every auto build, so new parlays never double up on what you've already bet.
+const savedKey = (l) => `${l.gameId}|${l.player}|${l.gradeKey}`;
+function withoutSaved(cands) {
+  const taken = new Set(slip.saved.flatMap((s) => s.legs.map(savedKey)));
+  const kept = cands.filter((c) => !taken.has(savedKey(c)));
+  kept.skipped = cands.length ? new Set(cands.filter((c) => taken.has(savedKey(c))).map(savedKey)).size : 0;
+  return kept;
+}
+
+function skippedNote(cands) {
+  return cands.skipped ? `<p class="note">Left out ${cands.skipped} pick${cands.skipped === 1 ? "" : "s"} already in your saved slips.</p>` : "";
 }
 
 // Score the slate once per league and day (10 min); auto parlays and hottest picks share it.

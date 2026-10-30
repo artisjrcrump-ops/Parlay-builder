@@ -17,7 +17,7 @@ A phone-first web app for building player-prop parlays.
 - Football props: passing/rushing/receiving yards, pass TDs, completions, attempts, interceptions, receptions, longest reception, rush+rec yards, Anytime TD and 2+ TDs
 - Basketball props: points, rebounds, assists, 3s, PRA, steals, blocks, P+R, P+A, R+A, double-double
 - 🔥 Hottest 10: the day's 10 best single props for the sport you pick in the dropdown, one per player, tap to add.
-- ⚡ Auto parlays: pick from a dropdown: mixed (5 themed parlays) or a single prop type (basketball: 3s, rebounds, assists, points, PRA; football: Anytime TD, passing, rushing, receiving yards, receptions). Mixed = 5 themed parlays (weak defense overs, hot hands, shootout games, lockdown unders, best value) built from the day's FanDuel props, with no pick shared between them, sized toward your payout target
+- ⚡ Auto parlays (and 🎯 SGPs, 🔥 Hottest 10) skip any pick already in a saved slip. pick from a dropdown: mixed (5 themed parlays) or a single prop type (basketball: 3s, rebounds, assists, points, PRA; football: Anytime TD, passing, rushing, receiving yards, receptions). Mixed = 5 themed parlays (weak defense overs, hot hands, shootout games, lockdown unders, best value) built from the day's FanDuel props, with no pick shared between them, sized toward your payout target
 
 ## Data
 - [ESPN public JSON feeds](https://gist.github.com/akeaswaran/b48b02f1c94f873c6655e7129910fc3b): unofficial, free, no key. Game lines come from DraftKings.

@@ -19,10 +19,11 @@ function hotHeader() {
     .map(([k, lg]) => `<option value="${k}" ${k === state.league ? "selected" : ""}>${lg.label}</option>`).join("")}</select></label>`;
 }
 
-function renderHottest(picks) {
+function renderHottest(picks, note = sheet.hotNote || "") {
   sheet.hotPicks = picks;
+  sheet.hotNote = note;
   const inSlip = (l) => slip.legs.some((x) => x.id === l.id);
-  $("sheet-body").innerHTML = `${hotHeader()}
+  $("sheet-body").innerHTML = `${hotHeader()}${note}
     ${picks.length ? `
     <div class="settings-actions top-actions">
       <button class="btn primary" data-hot-add="all">Add all ${picks.length} to slip</button>
@@ -49,7 +50,8 @@ async function openHottest() {
   const status = (msg) => { $("sheet-body").innerHTML = `${hotHeader()}<p class="status">${msg}</p>`; };
   if (!loadPref("sgoKey", "")) return status("Add your SportsGameOdds key in ⚙︎ Settings first. Hottest picks need FanDuel's lines.");
   try {
-    renderHottest(hottestPicks(await slateCandidates(status)));
+    const cands = withoutSaved(await slateCandidates(status));
+    renderHottest(hottestPicks(cands), skippedNote(cands));
   } catch (err) {
     status(/No upcoming/.test(err.message)
       ? `No upcoming ${LEAGUES[state.league].label} games on this day. Use ‹ › on the main screen to change the day.`
