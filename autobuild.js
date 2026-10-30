@@ -175,6 +175,10 @@ function renderParlays(parlays, opts = {}) {
     return;
   }
   $("sheet-body").innerHTML = `
+    <div class="settings-actions top-actions">
+      <button class="btn primary" data-use-parlay="all">Add all ${parlays.length} to slip</button>
+      <button class="btn" data-open-slip>Open slip</button>
+    </div>
     <p class="note">${opts.intro || "Built from offense vs defense ranks, defense vs position, recent form, season hit rate, the app's estimate vs FanDuel's line, and game totals. No pick appears in more than one parlay."} Payouts are at your ${stakeLabel()} stake.</p>
     ${parlays.map((p, i) => {
       const dec = p.legs.reduce((d, l) => d * l.dec, 1);
@@ -190,7 +194,7 @@ function renderParlays(parlays, opts = {}) {
             <small>${reason(l)}</small></div>
             <span class="leg-odds">${l.odds}</span>
           </div>`).join("")}
-        <button class="btn primary" data-use-parlay="${i}">Load into slip</button>
+        <button class="btn primary" data-use-parlay="${i}">Add to slip</button>
       </div>`;
     }).join("")}
     <p class="note">${opts.outro || "These are picks from a simple model, not guarantees. Same-game legs get repriced by FanDuel."}</p>`;
@@ -218,11 +222,19 @@ async function openAutoParlays() {
 $("auto").addEventListener("click", openAutoParlays);
 
 $("sheet-body").addEventListener("click", (e) => {
+  if (e.target.closest("[data-open-slip]")) return openSlip();
   const b = e.target.closest("[data-use-parlay]");
   if (!b || !sheet.autoParlays) return;
-  const p = sheet.autoParlays[+b.dataset.useParlay];
-  slip.legs = p.legs.map(({ id, player, team, opp, gameId, date, stat, side, line, odds, est, l5, season }) =>
-    ({ id, player, team, opp, gameId, date, stat, side, line, odds, est, l5, season, on: true }));
+  const which = b.dataset.useParlay;
+  const chosen = which === "all" ? sheet.autoParlays : [sheet.autoParlays[+which]];
+  // Add to whatever is already in the slip; every leg starts checked so you can uncheck the ones you don't want.
+  for (const p of chosen) {
+    for (const { id, player, team, opp, gameId, date, stat, side, line, odds, est, l5, season } of p.legs) {
+      if (slip.legs.some((x) => x.id === id)) continue;
+      slip.legs.push({ id, player, team, opp, gameId, date, stat, side, line, odds, est, l5, season, group: p.name, on: true });
+    }
+  }
   persist();
-  openSlip();
+  const buttons = which === "all" ? $("sheet-body").querySelectorAll("[data-use-parlay]") : [b];
+  buttons.forEach((x) => { x.textContent = "Added ✓"; x.classList.remove("primary"); });
 });

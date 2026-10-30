@@ -135,13 +135,17 @@ function renderSlip() {
       <button class="leg-toggle" data-toggle-leg="${l.id}" aria-label="Include leg">${l.on ? "✓" : ""}</button>
       <div class="leg-main">
         <div><b>${l.player}</b> ${legText(l)}</div>
-        <small>${l.team} vs ${l.opp} · est ${l.est} · L5 ${l.l5} · season ${l.season}</small>
+        <small>${l.team} vs ${l.opp} · est ${l.est} · L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
       </div>
       <span class="leg-odds">${l.odds}</span>
       <button class="leg-x" data-remove-leg="${l.id}" aria-label="Remove leg">✕</button>
     </div>`).join("");
 
+  const allOn = slip.legs.every((l) => l.on);
   $("sheet-body").innerHTML = slip.legs.length ? `
+    <div class="settings-actions top-actions">
+      <button class="btn" data-check-all="${allOn ? "off" : "on"}">${allOn ? "Uncheck all" : "Check all"}</button>
+    </div>
     <div class="slip-legs">${legs}</div>
     <div class="slip-sum">
       <label>Stake $<input id="stake" type="number" inputmode="decimal" min="1" step="1" value="${slip.stake}"></label>
@@ -178,7 +182,9 @@ $("sheet-body").addEventListener("click", (e) => {
   if (!t) return;
   const d = t.dataset;
   if (d.addLeg) return toggleCandidate(d.addLeg, t);
-  if (d.toggleLeg) {
+  if (d.checkAll) {
+    slip.legs.forEach((l) => { l.on = d.checkAll === "on"; });
+  } else if (d.toggleLeg) {
     const leg = slip.legs.find((x) => x.id === d.toggleLeg);
     if (leg) leg.on = !leg.on;
   } else if (d.removeLeg) {
