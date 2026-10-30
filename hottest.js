@@ -51,7 +51,9 @@ async function openHottest() {
   try {
     renderHottest(hottestPicks(await slateCandidates(status)));
   } catch (err) {
-    status(`Couldn't find picks (${err.message}).`);
+    status(/No upcoming/.test(err.message)
+      ? `No upcoming ${LEAGUES[state.league].label} games on this day. Use ‹ › on the main screen to change the day.`
+      : `Couldn't find picks (${err.message}).`);
   }
 }
 
