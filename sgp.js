@@ -21,9 +21,9 @@ function sgpThemes(g) {
   if (fav) {
     themes.push(
       { name: `${g[fav].name} roll`, why: `${g[fav].name} stars go over, ${g[dog].name} stars go under`,
-        fit: (c) => (c.teamSide === fav) === (c.side === "over") },
+        fit: (c) => (c.teamSide === fav) === (c.side === "over"), balance: true },
       { name: `${g[dog].name} hang around`, why: `${g[dog].name} stars go over in a closer game`,
-        fit: (c) => (c.teamSide === dog) === (c.side === "over") },
+        fit: (c) => (c.teamSide === dog) === (c.side === "over"), balance: true },
     );
   }
   themes.push(
@@ -47,6 +47,11 @@ function buildSgps(g, cands) {
       if (full(p)) continue;
       const themed = cands.filter((c) => p.fit(c) && canAdd(p, c));
       if (p.sort) themed.sort(p.sort);
+      // Alternate teams so "roll" scripts get overs from one side and unders from the other.
+      if (p.balance) {
+        const count = (side) => p.legs.filter((l) => l.teamSide === side).length;
+        themed.sort((a, b) => count(a.teamSide) - count(b.teamSide));
+      }
       // Stick to the game script; only "Best value" takes anything.
       const pick = themed[0];
       if (!pick) continue;
