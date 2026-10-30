@@ -372,3 +372,28 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
   gap: 6px;
 }
 .saved small { color: var(--muted); }
+
+.auto-btn { margin-left: auto; padding: 6px 12px; font-size: 13px; }
+
+.auto {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0;
+  display: grid;
+  gap: 8px;
+}
+.auto-head { display: flex; justify-content: space-between; gap: 8px; }
+.auto-head .in { color: var(--good); font-weight: 700; }
+.auto-head .out { color: var(--mid); font-weight: 700; }
+.auto-why { color: var(--muted); }
+.auto-leg {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  font-size: 14px;
+}
+.auto-leg small, .muted { color: var(--muted); font-size: 12px; }

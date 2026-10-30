@@ -12,6 +12,7 @@ A phone-first web app for building player-prop parlays.
 
 - Slip builder: tap Over/Under on a player to add a leg, tap legs on and off, set your stake, and see the payout against a $400–$2,500 target (with a same-game warning)
 - Save slips on your device and load them again later
+- ⚡ Auto parlays: 5 themed parlays (weak defense overs, hot hands, shootout games, lockdown unders, best value) built from the day's FanDuel props, with no pick shared between them, sized toward your payout target
 
 ## Coming next
 - Results tracking for saved slips
