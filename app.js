@@ -10,12 +10,14 @@ const LEAGUES = {
 
 const SITE = "https://site.api.espn.com/apis/site/v2/sports/";
 const STANDINGS = "https://site.api.espn.com/apis/v2/sports/";
+const WEB = "https://site.web.api.espn.com/apis/common/v3/sports/";
 
 const state = {
   league: loadPref("league", "nba"),
   date: new Date(),
   sort: loadPref("sort", "time"),
   ranks: {}, // league -> { teamId -> { off, def, ppg, papg, n } }
+  games: [],
 };
 
 function loadPref(key, fallback) {
@@ -163,7 +165,7 @@ function gameCard(g) {
     ? g.date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : g.detail;
   return `
-    <article class="game">
+    <article class="game" data-game="${g.id}">
       <div class="game-head">
         <span class="${g.state === "in" ? "live" : ""}">${time}</span>
         <span>${g.broadcast}</span>
@@ -203,6 +205,7 @@ async function load() {
     if (token !== loadToken) return;
     state.ranks[key] = ranks;
     const games = sortGames((board.events || []).map((ev) => parseGame(ev, ranks)));
+    state.games = games;
     $("games").innerHTML = games.map(gameCard).join("");
     $("status").textContent = games.length
       ? `${games.length} game${games.length === 1 ? "" : "s"} · updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
