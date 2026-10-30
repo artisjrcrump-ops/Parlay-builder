@@ -103,7 +103,7 @@ async function buildCandidates(progress) {
           player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
           stat: label, statKey: key, side, line: l.line, odds, dec,
           est: Math.round(est * 10) / 10, l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`,
-          l5Rate: h.l5 / h.l5n, prob, value, edgeAbs: Math.abs(edgePct),
+          l5Rate: h.l5 / h.l5n, prob, value, edgeAbs: Math.abs(edge) / Math.max(l.line, 5), // tiny lines don't count as big edges
           oppDefPct, oppDef: opp.def, oppN: opp.n, totalPct: totalPct(g.odds?.total || 0),
           injury: p.injury || "", on: true,
         });
