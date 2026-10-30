@@ -14,7 +14,8 @@ A phone-first web app for building player-prop parlays.
 - Save slips on your device and load them again later
 - 🎯 Same-game parlays: pick a game (or tap the button inside a game) for 5 SGPs, each following one game script (shootout, favorite rolls, underdog hangs around, grind it out, best value), with no shared picks
 - Defense vs position: basketball compares points allowed to guards/forwards/centers; football compares passing yards allowed (QB/WR/TE) and rushing yards allowed (RB). Warns at 15%+ below the slate average over the last 5 games
-- Football: Anytime TD and 2+ TDs props (Yes bets) alongside yardage and reception props
+- Football props: passing/rushing/receiving yards, pass TDs, completions, attempts, interceptions, receptions, longest reception, rush+rec yards, Anytime TD and 2+ TDs
+- Basketball props: points, rebounds, assists, 3s, PRA, steals, blocks, P+R, P+A, R+A, double-double
 - ⚡ Auto parlays: 5 themed parlays (weak defense overs, hot hands, shootout games, lockdown unders, best value) built from the day's FanDuel props, with no pick shared between them, sized toward your payout target
 
 ## Coming next

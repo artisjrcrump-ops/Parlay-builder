@@ -17,6 +17,16 @@ const PROP_STATS = {
   rushingYards: "rushing_yards",
   receptions: "receiving_receptions",
   receivingYards: "receiving_yards",
+  steals: "steals",
+  blocks: "blocks",
+  pr: "points+rebounds",
+  pa: "points+assists",
+  ra: "rebounds+assists",
+  passingAttempts: "passing_attempts",
+  completions: "passing_completions",
+  interceptions: "passing_interceptions",
+  longReception: "receiving_longestReception",
+  rushRec: "rushing+receiving_yards",
 };
 
 function oddsKey() {
@@ -105,6 +115,15 @@ function touchdownLines(ev, pid) {
   return out;
 }
 
+function doubleDoubleLine(ev, pid) {
+  const yes = ev.lines[`doubleDouble-${pid}-game-yn-yes`];
+  const ou = ev.lines[`doubleDouble-${pid}-game-ou-over`];
+  const odds = yes?.odds || (ou && parseFloat(ou.overUnder) === 0.5 ? ou.odds : null);
+  return odds
+    ? { doubleDouble: { line: 0.5, over: odds, under: null, statKey: "dd", yes: true, label: "Double-double", maxDec: 6 } }
+    : {};
+}
+
 // Returns { statKey: { line, over, under } } for this player, or null when unavailable.
 async function getPlayerLines(game, playerName) {
   const events = await loadOddsEvents(game);
@@ -120,7 +139,7 @@ async function getPlayerLines(game, playerName) {
     if (!over && !under) continue;
     out[statKey] = { line: parseFloat((over || under).overUnder), over: over?.odds, under: under?.odds };
   }
-  Object.assign(out, touchdownLines(ev, pid));
+  Object.assign(out, touchdownLines(ev, pid), doubleDoubleLine(ev, pid));
   return out;
 }
 

@@ -63,7 +63,7 @@ function propPicker({ player, team, opp, game, stats, lines, estimate, rows }) {
       const h = hits(rows, s.statKey, side, l.line);
       candidates[id] = {
         id, player, team, opp, gameId: game.id, date: game.date.toISOString(),
-        stat: s.label, side, line: l.line, odds, est: Math.round(est * 10) / 10,
+        stat: s.label, side, line: l.line, odds, est: Math.round(est * 10) / 10, yes: !!l.yes,
         l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`, on: true,
       };
       const inSlip = slip.legs.some((x) => x.id === id);
@@ -95,7 +95,7 @@ function toggleCandidate(id, btn) {
 }
 
 function legText(l) {
-  if (/TD/.test(l.stat) && !/Pass|Rush|Rec/.test(l.stat)) return l.stat; // "Anytime TD", "2+ TDs"
+  if (l.yes || (/TD/.test(l.stat) && !/Pass|Rush|Rec/.test(l.stat))) return l.stat; // "Anytime TD", "Double-double"
   return `${l.side === "over" ? "Over" : "Under"} ${l.line} ${l.stat}`;
 }
 

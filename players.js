@@ -8,15 +8,26 @@ const KEY_STATS = {
     { key: "assists", label: "AST" },
     { key: "threes", label: "3PM" },
     { key: "pra", label: "PRA" },
+    { key: "steals", label: "STL" },
+    { key: "blocks", label: "BLK" },
+    { key: "pr", label: "P+R" },
+    { key: "pa", label: "P+A" },
+    { key: "ra", label: "R+A" },
+    { key: "dd", label: "DD" },
   ],
   football: [
     { key: "passingYards", label: "Pass Yds" },
     { key: "passingTouchdowns", label: "Pass TD" },
+    { key: "completions", label: "Cmp" },
+    { key: "passingAttempts", label: "Att" },
+    { key: "interceptions", label: "INT" },
     { key: "rushingYards", label: "Rush Yds" },
     { key: "rushingTouchdowns", label: "Rush TD" },
     { key: "receptions", label: "Rec" },
     { key: "receivingYards", label: "Rec Yds" },
     { key: "receivingTouchdowns", label: "Rec TD" },
+    { key: "longReception", label: "Long Rec" },
+    { key: "rushRec", label: "Rush+Rec" },
     { key: "tds", label: "TDs" },
   ],
 };
@@ -151,6 +162,12 @@ async function loadGameLog(playerId) {
         stats.threes = stats.threePointFieldGoalsMade ?? 0;
         stats.pra = (stats.points || 0) + (stats.totalRebounds || 0) + (stats.assists || 0);
         stats.tds = (stats.rushingTouchdowns || 0) + (stats.receivingTouchdowns || 0);
+        stats.rushRec = (stats.rushingYards || 0) + (stats.receivingYards || 0);
+        stats.pr = (stats.points || 0) + (stats.totalRebounds || 0);
+        stats.pa = (stats.points || 0) + (stats.assists || 0);
+        stats.ra = (stats.totalRebounds || 0) + (stats.assists || 0);
+        stats.dd = ["points", "totalRebounds", "assists", "steals", "blocks"]
+          .filter((k) => (stats[k] || 0) >= 10).length >= 2 ? 1 : 0;
         rows.push({
           date: new Date(meta.gameDate),
           opp: meta.opponent?.abbreviation || "",
@@ -202,6 +219,7 @@ async function openPlayer(playerId) {
     if (sheet.game !== g) return;
     const has = new Set([...names.map((n) => n.split("-")[0]), "threes", "pra"]);
     if (has.has("rushingTouchdowns") || has.has("receivingTouchdowns")) has.add("tds");
+    if (has.has("rushingYards") && has.has("receivingYards")) has.add("rushRec");
     let stats = KEY_STATS[sportOf(state.league)].filter((s) => has.has(s.key));
     if (sportOf(state.league) === "basketball") stats = KEY_STATS.basketball;
     if (!rows.length) {
@@ -243,12 +261,13 @@ async function openPlayer(playerId) {
           const t = lines.twoTd;
           return `<td>${a || t ? `${a ? `ATD ${a.over}` : ""}<br><small>${t ? `2+ ${t.over}` : ""}</small>` : "–"}</td>`;
         }
+        if (s.key === "dd") return `<td>${lines.doubleDouble ? `Yes ${lines.doubleDouble.over}` : "–"}</td>`;
         const l = lines[s.key];
         return `<td>${l ? `${l.line}<br><small>${l.over ?? ""}/${l.under ?? ""}</small>` : "–"}</td>`;
       }).join("")}</tr>
       <tr class="edge"><td>Est. vs line</td>${stats.map((s) => {
         const l = lines[s.key];
-        if (!l || s.key === "tds") return "<td></td>";
+        if (!l || s.key === "tds" || s.key === "dd") return "<td></td>";
         const d = estimate(s.key) - l.line;
         return `<td class="${d >= 0 ? "up" : "down"}">${d >= 0 ? "+" : ""}${fmt(d, s.key)}</td>`;
       }).join("")}</tr>` : "";

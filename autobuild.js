@@ -86,7 +86,7 @@ async function scorePlayer(g, p, totalPct = 0.5) {
         + 0.25 * (0.5 + Math.max(-0.3, Math.min(0.3, edgePct * 2))) + matchup
         - (p.injury ? 0.05 : 0);
       // Defense vs position: no scoring overs into a tough matchup; small nudges otherwise.
-      const scoring = ["points", "pra", "threes", "passingYards", "rushingYards", "receivingYards", "receptions", "anytimeTd", "twoTd"].includes(key);
+      const scoring = ["points", "pra", "threes", "passingYards", "rushingYards", "receivingYards", "receptions", "anytimeTd", "twoTd", "pr", "pa", "rushRec", "longReception"].includes(key);
       if (mu?.tough && scoring && side === "over") continue;
       if (mu?.tough && side === "under") prob += 0.03;
       if (mu?.soft && scoring && side === "over") prob += 0.03;
@@ -94,11 +94,14 @@ async function scorePlayer(g, p, totalPct = 0.5) {
       if (prob < 0.55 || value <= 0 || edge <= 0) continue;
       const label = { points: "PTS", totalRebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA",
         passingYards: "Pass Yds", passingTouchdowns: "Pass TD", rushingYards: "Rush Yds",
-        receptions: "Rec", receivingYards: "Rec Yds", anytimeTd: "Anytime TD", twoTd: "2+ TDs" }[key] || key;
+        receptions: "Rec", receivingYards: "Rec Yds", anytimeTd: "Anytime TD", twoTd: "2+ TDs",
+      steals: "STL", blocks: "BLK", pr: "P+R", pa: "P+A", ra: "R+A", doubleDouble: "Double-double",
+      passingAttempts: "Pass Att", completions: "Completions", interceptions: "INT", longReception: "Long Rec",
+      rushRec: "Rush+Rec Yds" }[key] || key;
       out.push({
         id: `${g.id}|${p.name}|${label}|${side}`,
         player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
-        stat: label, statKey: key, side, line: l.line, odds, dec,
+        stat: label, statKey: key, side, line: l.line, odds, dec, yes: !!l.yes,
         est: Math.round(est * 10) / 10, l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`,
         l5Rate: h.l5 / h.l5n, prob, value, edgeAbs: Math.abs(edge) / Math.max(l.line, 5), // tiny lines don't count as big edges
         oppDefPct, oppDef: opp.def, oppN: opp.n, totalPct,
@@ -229,9 +232,9 @@ $("sheet-body").addEventListener("click", (e) => {
   const chosen = which === "all" ? sheet.autoParlays : [sheet.autoParlays[+which]];
   // Add to whatever is already in the slip; every leg starts checked so you can uncheck the ones you don't want.
   for (const p of chosen) {
-    for (const { id, player, team, opp, gameId, date, stat, side, line, odds, est, l5, season } of p.legs) {
+    for (const { id, player, team, opp, gameId, date, stat, side, line, odds, est, l5, season, yes } of p.legs) {
       if (slip.legs.some((x) => x.id === id)) continue;
-      slip.legs.push({ id, player, team, opp, gameId, date, stat, side, line, odds, est, l5, season, group: p.name, on: true });
+      slip.legs.push({ id, player, team, opp, gameId, date, stat, side, line, odds, est, l5, season, yes, group: p.name, on: true });
     }
   }
   persist();
