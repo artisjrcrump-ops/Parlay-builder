@@ -217,7 +217,7 @@ async function openPlayer(playerId) {
     const avgRow = (label, set) => `
       <tr class="avg"><td>${label}</td>${stats.map((s) => `<td>${fmt(avg(set, s.key), s.key)}</td>`).join("")}</tr>`;
     const predRow = `
-      <tr class="pred"><td>Tonight<br><small>est.</small></td>${stats.map((s) => {
+      <tr class="pred"><td>This game<br><small>est.</small></td>${stats.map((s) => {
         const l5 = avg(last5, s.key);
         const season = avg(rows, s.key);
         return `<td>${fmt((0.6 * l5 + 0.4 * season) * factor, s.key)}</td>`;
@@ -227,7 +227,7 @@ async function openPlayer(playerId) {
     const adj = Math.round((factor - 1) * 100);
     $("sheet-body").innerHTML = `
       ${inj ? `<p class="inj-banner">Injury status: ${inj}</p>` : ""}
-      <p class="matchup">Tonight vs ${oppRank}. Estimate adjusted ${adj >= 0 ? "+" : ""}${adj}% for the matchup.</p>
+      <p class="matchup">Vs ${oppRank}. Estimate adjusted ${adj >= 0 ? "+" : ""}${adj}% for the matchup.</p>
       <div class="table-wrap">
         <table class="log">
           <thead><tr><th></th>${head}</tr></thead>
