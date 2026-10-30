@@ -459,3 +459,14 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .res.push, .res.void { border-color: var(--mid); color: var(--mid); }
 
 .record { margin-top: 12px; }
+
+.mode { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-weight: 600; }
+.mode select {
+  flex: 1;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 15px;
+}

@@ -67,10 +67,10 @@ async function scorePlayer(g, p, totalPct = 0.5) {
   const opp = g[p.side === "home" ? "away" : "home"];
   const factor = opponentFactor(opp.id);
   const last5 = rows.slice(0, 5);
-  const mu = await matchupFor(opp.id, p.pos).catch(() => null);
   const out = [];
   for (const [key, l] of Object.entries(lines)) {
     const statKey = l.statKey || key;
+    const mu = await matchupFor(opp.id, p.pos, key).catch(() => null);
     const est = (0.6 * avg(last5, statKey) + 0.4 * avg(rows, statKey)) * factor;
     for (const side of ["over", "under"]) {
       const odds = side === "over" ? l.over : l.under;
@@ -86,10 +86,11 @@ async function scorePlayer(g, p, totalPct = 0.5) {
         + 0.25 * (0.5 + Math.max(-0.3, Math.min(0.3, edgePct * 2))) + matchup
         - (p.injury ? 0.05 : 0);
       // Defense vs position: no scoring overs into a tough matchup; small nudges otherwise.
-      const scoring = ["points", "pra", "threes", "passingYards", "rushingYards", "receivingYards", "receptions", "anytimeTd", "twoTd", "pr", "pa", "rushRec", "longReception"].includes(key);
-      if (mu?.tough && scoring && side === "over") continue;
+      // Defense vs position for this exact stat: no overs into a tough matchup; small nudges otherwise.
+      if (mu?.tough && side === "over") continue;
       if (mu?.tough && side === "under") prob += 0.03;
-      if (mu?.soft && scoring && side === "over") prob += 0.03;
+      if (mu?.soft && side === "over") prob += 0.03;
+      if (mu?.soft && side === "under") prob -= 0.03;
       const value = prob - 1 / dec;
       if (prob < 0.55 || value <= 0 || edge <= 0) continue;
       const label = { points: "PTS", totalRebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA",
@@ -174,10 +175,11 @@ function reason(l) {
 
 function renderParlays(parlays, opts = {}) {
   if (!parlays.length) {
-    $("sheet-body").innerHTML = `<p class="status">${opts.empty || "Not enough strong picks on this slate to build parlays. Try another day or league."}</p>`;
+    $("sheet-body").innerHTML = `${opts.header || ""}<p class="status">${opts.empty || "Not enough strong picks on this slate to build parlays. Try another day or league."}</p>`;
     return;
   }
   $("sheet-body").innerHTML = `
+    ${opts.header || ""}
     <div class="settings-actions top-actions">
       <button class="btn primary" data-use-parlay="all">Add all ${parlays.length} to slip</button>
       <button class="btn" data-open-slip>Open slip</button>
@@ -204,6 +206,64 @@ function renderParlays(parlays, opts = {}) {
   sheet.autoParlays = parlays;
 }
 
+const AUTO_MODES = {
+  basketball: [
+    ["mixed", "Mixed: 5 themed parlays"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
+    ["assists", "Assists"], ["points", "Points"], ["pra", "Pts + Reb + Ast"],
+  ],
+  football: [
+    ["mixed", "Mixed: 5 themed parlays"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
+    ["rushingYards", "Rushing yards"], ["receivingYards", "Receiving yards"], ["receptions", "Receptions"],
+  ],
+};
+
+// 5 parlays from one prop type, best picks spread snake-style so #1 isn't the only good one.
+function buildStatParlays(cands, statKey, label) {
+  const pool = cands.filter((c) => c.statKey === statKey);
+  const parlays = [1, 2, 3, 4, 5].map((n) => ({ name: `${label} #${n}`, why: "", legs: [] }));
+  const used = new Set();
+  const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.low;
+  const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`)
+    && !p.legs.some((l) => l.player === c.player)
+    && p.legs.filter((l) => l.gameId === c.gameId).length < MAX_PER_GAME;
+  let round = 0;
+  let progress = true;
+  while (progress) {
+    progress = false;
+    const order = round++ % 2 ? [...parlays].reverse() : parlays;
+    for (const p of order) {
+      if (full(p)) continue;
+      const pick = pool.find((c) => canAdd(p, c));
+      if (!pick) continue;
+      p.legs.push({ ...pick });
+      used.add(pick.id);
+      used.add(`${pick.player}|${pick.stat}`);
+      progress = true;
+    }
+  }
+  const out = parlays.filter((p) => p.legs.length >= 2);
+  out.forEach((p) => {
+    const overs = p.legs.filter((l) => l.side === "over").length;
+    p.why = `${overs} over${overs === 1 ? "" : "s"}, ${p.legs.length - overs} under${p.legs.length - overs === 1 ? "" : "s"}, picked on hit rate, estimate vs line and how the opponent defends this stat`;
+  });
+  return out;
+}
+
+function renderAuto() {
+  const c = sheet.autoCache;
+  const modes = AUTO_MODES[sportOf(state.league)];
+  const mode = modes.some(([k]) => k === sheet.autoMode) ? sheet.autoMode : "mixed";
+  const label = modes.find(([k]) => k === mode)[1];
+  const parlays = mode === "mixed" ? buildParlays(c.cands) : buildStatParlays(c.cands, mode, label);
+  renderParlays(parlays, {
+    header: `<label class="mode"><span>Build</span><select id="auto-mode">${modes
+      .map(([k, l]) => `<option value="${k}" ${k === mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>`,
+    intro: mode === "mixed" ? undefined
+      : `Only ${label.toLowerCase()} props. Each pick is checked against how tonight's opponent defends that stat at the player's position, plus recent form, season hit rate and the estimate vs FanDuel's line. No pick appears in more than one parlay.`,
+    empty: `Not enough strong ${mode === "mixed" ? "" : `${label.toLowerCase()} `}picks on this slate. Try another prop type, day or league.`,
+  });
+}
+
 async function openAutoParlays() {
   sheet.game = null;
   $("sheet-back").hidden = true;
@@ -214,15 +274,25 @@ async function openAutoParlays() {
     return;
   }
   const status = (msg) => { $("sheet-body").innerHTML = `<p class="status">${msg}</p>`; };
+  const key = `${state.league}.${ymd(state.date)}`;
   try {
-    const cands = await buildCandidates(status);
-    renderParlays(buildParlays(cands));
+    // Score the slate once; switching prop types just rebuilds from the same picks.
+    if (sheet.autoCache?.key !== key || Date.now() - sheet.autoCache.at > 10 * 60 * 1000) {
+      sheet.autoCache = { key, at: Date.now(), cands: await buildCandidates(status) };
+    }
+    renderAuto();
   } catch (err) {
     status(`Couldn't build parlays (${err.message}).`);
   }
 }
 
 $("auto").addEventListener("click", openAutoParlays);
+
+$("sheet-body").addEventListener("change", (e) => {
+  if (e.target.id !== "auto-mode") return;
+  sheet.autoMode = e.target.value;
+  renderAuto();
+});
 
 $("sheet-body").addEventListener("click", (e) => {
   if (e.target.closest("[data-open-slip]")) return openSlip();

@@ -294,13 +294,22 @@ async function openPlayer(playerId) {
       </div>
       <p class="note">Estimate = 60% last 5 + 40% season, scaled for this opponent. ${linesNote}</p>
       ${propPicker({ player: p.name, playerId, team: team.abbr, opp: opp.abbr, game: g, stats, lines, estimate, rows })}`;
-    matchupFor(opp.id, p.pos).then((mu) => {
+    // Matchup for each key stat: e.g. points, rebounds, assists and 3s allowed to this position.
+    const checks = sportOf(state.league) === "football"
+      ? [["receivingYards", "Yards"], ["tds", "TDs"]]
+      : [["points", "Points"], ["totalRebounds", "Rebounds"], ["assists", "Assists"], ["threes", "3s"]];
+    if (sportOf(state.league) === "football" && /RB|FB/.test(p.pos)) checks[0][0] = "rushingYards";
+    Promise.all(checks.map(([k]) => matchupFor(opp.id, p.pos, k).catch(() => null))).then((mus) => {
       const box = $("matchup-warn");
-      if (!mu || !box || sheet.game !== g) return;
-      if (mu.tough) box.innerHTML = `<p class="inj-banner">Tough matchup: ${opp.name} ${mu.label}. Think twice about ${sportOf(state.league) === "football" ? "yardage and TD" : "points"} overs.</p>`;
-      else if (mu.soft) box.innerHTML = `<p class="good-banner">Good matchup: ${opp.name} ${mu.label}.</p>`;
-      else box.innerHTML = `<p class="note">Position matchup: ${opp.name} ${mu.label}.</p>`;
-    }).catch(() => {});
+      if (!box || sheet.game !== g) return;
+      box.innerHTML = mus.map((mu, i) => {
+        if (!mu) return "";
+        const name = checks[i][1];
+        if (mu.tough) return `<p class="inj-banner">Tough for ${name.toLowerCase()}: ${opp.name} ${mu.label}.</p>`;
+        if (mu.soft) return `<p class="good-banner">Good for ${name.toLowerCase()}: ${opp.name} ${mu.label}.</p>`;
+        return `<p class="note">${name}: ${opp.name} ${mu.label}.</p>`;
+      }).join("");
+    });
   } catch (err) {
     $("sheet-body").innerHTML = `<p class="status">Couldn't load game log (${err.message}).</p>`;
   }
