@@ -56,6 +56,58 @@ function stakeLabel() {
   return money(slip.stake);
 }
 
+// Every qualifying Over/Under leg for one player in one game, scored.
+async function scorePlayer(g, p, totalPct = 0.5) {
+  if (/out|doubtful/i.test(p.injury || "")) return [];
+  const lines = await getPlayerLines(g, p.name);
+  if (!lines || !Object.keys(lines).length) return [];
+  const { rows } = await loadGameLog(p.id);
+  if (rows.length < 3) return [];
+  const team = g[p.side];
+  const opp = g[p.side === "home" ? "away" : "home"];
+  const factor = opponentFactor(opp.id);
+  const last5 = rows.slice(0, 5);
+  const mu = await matchupFor(opp.id, p.pos).catch(() => null);
+  const out = [];
+  for (const [key, l] of Object.entries(lines)) {
+    const est = (0.6 * avg(last5, key) + 0.4 * avg(rows, key)) * factor;
+    for (const side of ["over", "under"]) {
+      const odds = side === "over" ? l.over : l.under;
+      const dec = decimal(odds);
+      if (!dec || dec < ODDS_RANGE[0] || dec > ODDS_RANGE[1]) continue;
+      const h = hits(rows, key, side, l.line);
+      const edge = side === "over" ? est - l.line : l.line - est;
+      const edgePct = l.line ? edge / l.line : 0;
+      const oppDefPct = opp.def && opp.n ? opp.def / opp.n : 0.5;
+      // Matchup nudge: overs like bad defenses, unders like good ones.
+      const matchup = (side === "over" ? oppDefPct - 0.5 : 0.5 - oppDefPct) * 0.08;
+      let prob = 0.45 * (h.all / h.n) + 0.3 * (h.l5 / h.l5n)
+        + 0.25 * (0.5 + Math.max(-0.3, Math.min(0.3, edgePct * 2))) + matchup
+        - (p.injury ? 0.05 : 0);
+      // Defense vs position: no scoring overs into a tough matchup; small nudges otherwise.
+      const scoring = ["points", "pra", "threes"].includes(key);
+      if (mu?.tough && scoring && side === "over") continue;
+      if (mu?.tough && side === "under") prob += 0.03;
+      if (mu?.soft && scoring && side === "over") prob += 0.03;
+      const value = prob - 1 / dec;
+      if (prob < 0.55 || value <= 0 || edge <= 0) continue;
+      const label = { points: "PTS", totalRebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA",
+        passingYards: "Pass Yds", passingTouchdowns: "Pass TD", rushingYards: "Rush Yds",
+        receptions: "Rec", receivingYards: "Rec Yds" }[key] || key;
+      out.push({
+        id: `${g.id}|${p.name}|${label}|${side}`,
+        player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
+        stat: label, statKey: key, side, line: l.line, odds, dec,
+        est: Math.round(est * 10) / 10, l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`,
+        l5Rate: h.l5 / h.l5n, prob, value, edgeAbs: Math.abs(edge) / Math.max(l.line, 5), // tiny lines don't count as big edges
+        oppDefPct, oppDef: opp.def, oppN: opp.n, totalPct,
+        injury: p.injury || "", matchup: mu && (mu.tough || mu.soft) ? (mu.tough ? "tough matchup" : "soft matchup") : "", on: true,
+      });
+    }
+  }
+  return out;
+}
+
 async function buildCandidates(progress) {
   const games = state.games.filter((g) => g.state === "pre");
   if (!games.length) throw new Error("No upcoming games on this day.");
@@ -74,55 +126,9 @@ async function buildCandidates(progress) {
 
   let done = 0;
   const results = await pool(jobs, 6, async ({ g, p }) => {
-    if (/out|doubtful/i.test(p.injury || "")) return [];
-    const lines = await getPlayerLines(g, p.name);
+    const legs = await scorePlayer(g, p, totalPct(g.odds?.total || 0));
     progress(`Checking players… ${++done}/${jobs.length}`);
-    if (!lines || !Object.keys(lines).length) return [];
-    const { rows } = await loadGameLog(p.id);
-    if (rows.length < 3) return [];
-    const team = g[p.side];
-    const opp = g[p.side === "home" ? "away" : "home"];
-    const factor = opponentFactor(opp.id);
-    const last5 = rows.slice(0, 5);
-    const mu = await matchupFor(opp.id, p.pos).catch(() => null);
-    const out = [];
-    for (const [key, l] of Object.entries(lines)) {
-      const est = (0.6 * avg(last5, key) + 0.4 * avg(rows, key)) * factor;
-      for (const side of ["over", "under"]) {
-        const odds = side === "over" ? l.over : l.under;
-        const dec = decimal(odds);
-        if (!dec || dec < ODDS_RANGE[0] || dec > ODDS_RANGE[1]) continue;
-        const h = hits(rows, key, side, l.line);
-        const edge = side === "over" ? est - l.line : l.line - est;
-        const edgePct = l.line ? edge / l.line : 0;
-        const oppDefPct = opp.def && opp.n ? opp.def / opp.n : 0.5;
-        // Matchup nudge: overs like bad defenses, unders like good ones.
-        const matchup = (side === "over" ? oppDefPct - 0.5 : 0.5 - oppDefPct) * 0.08;
-        let prob = 0.45 * (h.all / h.n) + 0.3 * (h.l5 / h.l5n)
-          + 0.25 * (0.5 + Math.max(-0.3, Math.min(0.3, edgePct * 2))) + matchup
-          - (p.injury ? 0.05 : 0);
-        // Defense vs position: no scoring overs into a tough matchup; small nudges otherwise.
-        const scoring = ["points", "pra", "threes"].includes(key);
-        if (mu?.tough && scoring && side === "over") continue;
-        if (mu?.tough && side === "under") prob += 0.03;
-        if (mu?.soft && scoring && side === "over") prob += 0.03;
-        const value = prob - 1 / dec;
-        if (prob < 0.55 || value <= 0 || edge <= 0) continue;
-        const label = { points: "PTS", totalRebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA",
-          passingYards: "Pass Yds", passingTouchdowns: "Pass TD", rushingYards: "Rush Yds",
-          receptions: "Rec", receivingYards: "Rec Yds" }[key] || key;
-        out.push({
-          id: `${g.id}|${p.name}|${label}|${side}`,
-          player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
-          stat: label, statKey: key, side, line: l.line, odds, dec,
-          est: Math.round(est * 10) / 10, l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`,
-          l5Rate: h.l5 / h.l5n, prob, value, edgeAbs: Math.abs(edge) / Math.max(l.line, 5), // tiny lines don't count as big edges
-          oppDefPct, oppDef: opp.def, oppN: opp.n, totalPct: totalPct(g.odds?.total || 0),
-          injury: p.injury || "", matchup: mu && (mu.tough || mu.soft) ? (mu.tough ? "tough matchup" : "soft matchup") : "", on: true,
-        });
-      }
-    }
-    return out;
+    return legs;
   });
   return results.flat().filter(Boolean).sort((a, b) => b.prob + b.value - (a.prob + a.value));
 }
@@ -164,13 +170,13 @@ function reason(l) {
   return bits.join(" · ");
 }
 
-function renderParlays(parlays) {
+function renderParlays(parlays, opts = {}) {
   if (!parlays.length) {
-    $("sheet-body").innerHTML = `<p class="status">Not enough strong picks on this slate to build parlays. Try another day or league.</p>`;
+    $("sheet-body").innerHTML = `<p class="status">${opts.empty || "Not enough strong picks on this slate to build parlays. Try another day or league."}</p>`;
     return;
   }
   $("sheet-body").innerHTML = `
-    <p class="note">Built from offense vs defense ranks, defense vs position, recent form, season hit rate, the app's estimate vs FanDuel's line, and game totals. No pick appears in more than one parlay. Payouts are at your ${stakeLabel()} stake.</p>
+    <p class="note">${opts.intro || "Built from offense vs defense ranks, defense vs position, recent form, season hit rate, the app's estimate vs FanDuel's line, and game totals. No pick appears in more than one parlay."} Payouts are at your ${stakeLabel()} stake.</p>
     ${parlays.map((p, i) => {
       const dec = p.legs.reduce((d, l) => d * l.dec, 1);
       const pay = slip.stake * dec;
@@ -188,7 +194,7 @@ function renderParlays(parlays) {
         <button class="btn primary" data-use-parlay="${i}">Load into slip</button>
       </div>`;
     }).join("")}
-    <p class="note">These are picks from a simple model, not guarantees. Same-game legs get repriced by FanDuel.</p>`;
+    <p class="note">${opts.outro || "These are picks from a simple model, not guarantees. Same-game legs get repriced by FanDuel."}</p>`;
   sheet.autoParlays = parlays;
 }
 

@@ -97,7 +97,8 @@ async function renderGame() {
   const tabs = ["away", "home"]
     .map((s) => `<button class="tab ${s === sheet.side ? "active" : ""}" data-side="${s}">${g[s].name}</button>`)
     .join("");
-  $("sheet-body").innerHTML = `<div class="tabs">${tabs}</div><div id="roster"><p class="status">Loading roster…</p></div>`;
+  const sgpBtn = g.state === "pre" ? `<button class="btn primary sgp-inline" data-sgp-game="${g.id}">🎯 Build same-game parlays</button>` : "";
+  $("sheet-body").innerHTML = `${sgpBtn}<div class="tabs">${tabs}</div><div id="roster"><p class="status">Loading roster…</p></div>`;
   try {
     const players = await loadRoster(team.id);
     if (sheet.game !== g) return;

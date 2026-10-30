@@ -373,7 +373,9 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 }
 .saved small { color: var(--muted); }
 
-.auto-btn { margin-left: auto; padding: 6px 12px; font-size: 13px; }
+.actions-row { display: flex; gap: 6px; margin-top: 8px; }
+.actions-row .btn { flex: 1; padding: 8px 6px; font-size: 13px; }
+.sgp-inline { width: 100%; margin-top: 12px; }
 
 .auto {
   background: var(--card);
