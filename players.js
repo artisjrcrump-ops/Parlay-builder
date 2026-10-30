@@ -262,7 +262,8 @@ async function openPlayer(playerId) {
           <tbody>${gameRows}${avgRow("Last 5", last5)}${avgRow(`Season (${rows.length})`, rows)}${predRow}${fdRow}</tbody>
         </table>
       </div>
-      <p class="note">Estimate = 60% last 5 + 40% season, scaled for this opponent. ${linesNote}</p>`;
+      <p class="note">Estimate = 60% last 5 + 40% season, scaled for this opponent. ${linesNote}</p>
+      ${propPicker({ player: p.name, team: team.abbr, opp: opp.abbr, game: g, stats, lines, estimate, rows })}`;
   } catch (err) {
     $("sheet-body").innerHTML = `<p class="status">Couldn't load game log (${err.message}).</p>`;
   }

@@ -10,9 +10,11 @@ A phone-first web app for building player-prop parlays.
 - Tap a game for rosters (leaders starred, injuries flagged); tap a player for the last 5 games, season average and an estimate for this game
 - FanDuel prop lines next to the estimate, once you add a free SportsGameOdds key in ⚙︎ Settings (stored only on your device)
 
+- Slip builder: tap Over/Under on a player to add a leg, tap legs on and off, set your stake, and see the payout against a $400–$2,500 target (with a same-game warning)
+- Save slips on your device and load them again later
+
 ## Coming next
-- Slip builder with tap-to-add legs and payout math
-- Saved slips and results tracking
+- Results tracking for saved slips
 
 ## Data
 - [ESPN public JSON feeds](https://gist.github.com/akeaswaran/b48b02f1c94f873c6655e7129910fc3b): unofficial, free, no key. Game lines come from DraftKings.
