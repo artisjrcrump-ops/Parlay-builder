@@ -16,6 +16,7 @@ A phone-first web app for building player-prop parlays.
 - Defense vs position, per stat: basketball compares points, rebounds, assists and 3s allowed to guards/forwards/centers; football compares passing yards allowed (QB/WR/TE) and rushing yards allowed (RB) and offensive TDs allowed. Warns at 15%+ below the slate average over the last 5 games
 - Football props: passing/rushing/receiving yards, pass TDs, completions, attempts, interceptions, receptions, longest reception, rush+rec yards, Anytime TD and 2+ TDs
 - Basketball props: points, rebounds, assists, 3s, PRA, steals, blocks, P+R, P+A, R+A, double-double
+- 🔥 Hottest 10: the day's 10 best single props for the sport you pick in the dropdown, one per player, tap to add.
 - ⚡ Auto parlays: pick from a dropdown: mixed (5 themed parlays) or a single prop type (basketball: 3s, rebounds, assists, points, PRA; football: Anytime TD, passing, rushing, receiving yards, receptions). Mixed = 5 themed parlays (weak defense overs, hot hands, shootout games, lockdown unders, best value) built from the day's FanDuel props, with no pick shared between them, sized toward your payout target
 
 ## Data

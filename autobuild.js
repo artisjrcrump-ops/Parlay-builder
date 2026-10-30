@@ -264,6 +264,15 @@ function renderAuto() {
   });
 }
 
+// Score the slate once per league and day (10 min); auto parlays and hottest picks share it.
+async function slateCandidates(progress) {
+  const key = `${state.league}.${ymd(state.date)}`;
+  if (sheet.autoCache?.key !== key || Date.now() - sheet.autoCache.at > 10 * 60 * 1000) {
+    sheet.autoCache = { key, at: Date.now(), cands: await buildCandidates(progress) };
+  }
+  return sheet.autoCache.cands;
+}
+
 async function openAutoParlays() {
   sheet.game = null;
   $("sheet-back").hidden = true;
@@ -274,12 +283,8 @@ async function openAutoParlays() {
     return;
   }
   const status = (msg) => { $("sheet-body").innerHTML = `<p class="status">${msg}</p>`; };
-  const key = `${state.league}.${ymd(state.date)}`;
   try {
-    // Score the slate once; switching prop types just rebuilds from the same picks.
-    if (sheet.autoCache?.key !== key || Date.now() - sheet.autoCache.at > 10 * 60 * 1000) {
-      sheet.autoCache = { key, at: Date.now(), cands: await buildCandidates(status) };
-    }
+    await slateCandidates(status);
     renderAuto();
   } catch (err) {
     status(`Couldn't build parlays (${err.message}).`);
