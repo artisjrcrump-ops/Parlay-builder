@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Parlay Builder</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="title-row">
+      <h1>Parlay Builder</h1>
+      <button id="refresh" class="icon-btn" aria-label="Refresh">↻</button>
+    </div>
+    <nav id="leagues" class="tabs" role="tablist"></nav>
+    <div class="date-row">
+      <button id="prev-day" class="icon-btn" aria-label="Previous day">‹</button>
+      <span id="date-label"></span>
+      <button id="next-day" class="icon-btn" aria-label="Next day">›</button>
+    </div>
+    <div class="sort-row">
+      <label for="sort">Sort</label>
+      <select id="sort">
+        <option value="time">Start time</option>
+        <option value="weakdef">Weakest defense in game</option>
+        <option value="total">Highest total</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <p id="status" class="status"></p>
+    <section id="games" class="games"></section>
+  </main>
+
+  <footer class="foot">
+    <p>Off / Def ranks are by points scored and allowed per game. 1 is best. Data: ESPN. Lines shown are ESPN's (DraftKings).</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
