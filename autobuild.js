@@ -30,7 +30,9 @@ async function gamePlayers(g) {
     for (const cat of team.leaders || []) {
       for (const l of (cat.leaders || []).slice(0, 1)) {
         const a = l.athlete;
-        if (a?.id && !players.has(a.id)) players.set(a.id, { id: a.id, name: a.displayName, side, injury: injuries[a.id] });
+        if (a?.id && !players.has(a.id)) {
+          players.set(a.id, { id: a.id, name: a.displayName, pos: a.position?.abbreviation, side, injury: injuries[a.id] });
+        }
       }
     }
   }
@@ -65,6 +67,11 @@ async function buildCandidates(progress) {
   const jobs = [];
   games.forEach((g, i) => (perGame[i] || []).forEach((p) => jobs.push({ g, p })));
 
+  if (sportOf(state.league) === "basketball") {
+    progress("Checking defense vs position for every team…");
+    await loadSlateDvp().catch(() => null);
+  }
+
   let done = 0;
   const results = await pool(jobs, 6, async ({ g, p }) => {
     if (/out|doubtful/i.test(p.injury || "")) return [];
@@ -77,6 +84,7 @@ async function buildCandidates(progress) {
     const opp = g[p.side === "home" ? "away" : "home"];
     const factor = opponentFactor(opp.id);
     const last5 = rows.slice(0, 5);
+    const mu = await matchupFor(opp.id, p.pos).catch(() => null);
     const out = [];
     for (const [key, l] of Object.entries(lines)) {
       const est = (0.6 * avg(last5, key) + 0.4 * avg(rows, key)) * factor;
@@ -90,9 +98,14 @@ async function buildCandidates(progress) {
         const oppDefPct = opp.def && opp.n ? opp.def / opp.n : 0.5;
         // Matchup nudge: overs like bad defenses, unders like good ones.
         const matchup = (side === "over" ? oppDefPct - 0.5 : 0.5 - oppDefPct) * 0.08;
-        const prob = 0.45 * (h.all / h.n) + 0.3 * (h.l5 / h.l5n)
+        let prob = 0.45 * (h.all / h.n) + 0.3 * (h.l5 / h.l5n)
           + 0.25 * (0.5 + Math.max(-0.3, Math.min(0.3, edgePct * 2))) + matchup
           - (p.injury ? 0.05 : 0);
+        // Defense vs position: no scoring overs into a tough matchup; small nudges otherwise.
+        const scoring = ["points", "pra", "threes"].includes(key);
+        if (mu?.tough && scoring && side === "over") continue;
+        if (mu?.tough && side === "under") prob += 0.03;
+        if (mu?.soft && scoring && side === "over") prob += 0.03;
         const value = prob - 1 / dec;
         if (prob < 0.55 || value <= 0 || edge <= 0) continue;
         const label = { points: "PTS", totalRebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA",
@@ -105,7 +118,7 @@ async function buildCandidates(progress) {
           est: Math.round(est * 10) / 10, l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`,
           l5Rate: h.l5 / h.l5n, prob, value, edgeAbs: Math.abs(edge) / Math.max(l.line, 5), // tiny lines don't count as big edges
           oppDefPct, oppDef: opp.def, oppN: opp.n, totalPct: totalPct(g.odds?.total || 0),
-          injury: p.injury || "", on: true,
+          injury: p.injury || "", matchup: mu && (mu.tough || mu.soft) ? (mu.tough ? "tough matchup" : "soft matchup") : "", on: true,
         });
       }
     }
@@ -146,6 +159,7 @@ function buildParlays(cands) {
 function reason(l) {
   const bits = [`est ${l.est}`, `hit ${l.l5} last 5`];
   if (l.oppDef) bits.push(`vs ${ordinal(l.oppDef)} D`);
+  if (l.matchup) bits.push(l.matchup);
   if (l.injury) bits.push(l.injury);
   return bits.join(" · ");
 }
@@ -156,7 +170,7 @@ function renderParlays(parlays) {
     return;
   }
   $("sheet-body").innerHTML = `
-    <p class="note">Built from offense vs defense ranks, recent form, season hit rate, the app's estimate vs FanDuel's line, and game totals. No pick appears in more than one parlay. Payouts are at your ${stakeLabel()} stake.</p>
+    <p class="note">Built from offense vs defense ranks, defense vs position, recent form, season hit rate, the app's estimate vs FanDuel's line, and game totals. No pick appears in more than one parlay. Payouts are at your ${stakeLabel()} stake.</p>
     ${parlays.map((p, i) => {
       const dec = p.legs.reduce((d, l) => d * l.dec, 1);
       const pay = slip.stake * dec;

@@ -256,6 +256,7 @@ async function openPlayer(playerId) {
     $("sheet-body").innerHTML = `
       ${inj ? `<p class="inj-banner">Injury status: ${inj}</p>` : ""}
       <p class="matchup">Vs ${oppRank}. Estimate adjusted ${adj >= 0 ? "+" : ""}${adj}% for the matchup.</p>
+      <div id="matchup-warn"></div>
       <div class="table-wrap">
         <table class="log">
           <thead><tr><th></th>${head}</tr></thead>
@@ -264,6 +265,13 @@ async function openPlayer(playerId) {
       </div>
       <p class="note">Estimate = 60% last 5 + 40% season, scaled for this opponent. ${linesNote}</p>
       ${propPicker({ player: p.name, team: team.abbr, opp: opp.abbr, game: g, stats, lines, estimate, rows })}`;
+    matchupFor(opp.id, p.pos).then((mu) => {
+      const box = $("matchup-warn");
+      if (!mu || !box || sheet.game !== g) return;
+      if (mu.tough) box.innerHTML = `<p class="inj-banner">Tough matchup: ${opp.name} ${mu.label}. Think twice about points overs.</p>`;
+      else if (mu.soft) box.innerHTML = `<p class="good-banner">Good matchup: ${opp.name} ${mu.label}.</p>`;
+      else box.innerHTML = `<p class="note">Position matchup: ${opp.name} ${mu.label}.</p>`;
+    }).catch(() => {});
   } catch (err) {
     $("sheet-body").innerHTML = `<p class="status">Couldn't load game log (${err.message}).</p>`;
   }
