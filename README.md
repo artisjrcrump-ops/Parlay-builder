@@ -11,15 +11,12 @@ A phone-first web app for building player-prop parlays.
 - FanDuel prop lines next to the estimate, once you add a free SportsGameOdds key in ⚙︎ Settings (stored only on your device)
 
 - Slip builder: tap Over/Under on a player to add a leg, tap legs on and off, set your stake, and see the payout against a $400–$2,500 target (with a same-game warning)
-- Save slips on your device and load them again later
+- 📋 My slips: saved slips with editable lines, odds, stake and book (FanDuel/DraftKings), results graded automatically from ESPN box scores after games end (or set by hand), and a running record with profit and leg hit rate
 - 🎯 Same-game parlays: pick a game (or tap the button inside a game) for 5 SGPs, each following one game script (shootout, favorite rolls, underdog hangs around, grind it out, best value), with no shared picks
 - Defense vs position: basketball compares points allowed to guards/forwards/centers; football compares passing yards allowed (QB/WR/TE) and rushing yards allowed (RB). Warns at 15%+ below the slate average over the last 5 games
 - Football props: passing/rushing/receiving yards, pass TDs, completions, attempts, interceptions, receptions, longest reception, rush+rec yards, Anytime TD and 2+ TDs
 - Basketball props: points, rebounds, assists, 3s, PRA, steals, blocks, P+R, P+A, R+A, double-double
 - ⚡ Auto parlays: 5 themed parlays (weak defense overs, hot hands, shootout games, lockdown unders, best value) built from the day's FanDuel props, with no pick shared between them, sized toward your payout target
-
-## Coming next
-- Results tracking for saved slips
 
 ## Data
 - [ESPN public JSON feeds](https://gist.github.com/akeaswaran/b48b02f1c94f873c6655e7129910fc3b): unofficial, free, no key. Game lines come from DraftKings.

@@ -1,5 +1,5 @@
 // Slip builder: tap Over/Under on a player page to add a leg, tap legs on and off,
-// and see the payout against the $400–$2,500 target. Saved slips live on this device.
+// and see the payout against the $400–$2,500 target. Saved slips (results.js) live on this device.
 // Shares globals from the other scripts (state, sheet, $, fmt, openSheet, loadPref, savePref).
 
 const TARGET = { low: 400, high: 2500 };
@@ -47,7 +47,7 @@ function hits(rows, key, side, line) {
 }
 
 // HTML for the Over/Under buttons on a player page.
-function propPicker({ player, team, opp, game, stats, lines, estimate, rows }) {
+function propPicker({ player, playerId, team, opp, game, stats, lines, estimate, rows }) {
   if (!lines || !Object.keys(lines).length) return "";
   // Stat props from the table columns, plus yes-only props like Anytime TD that score a column stat.
   const items = [
@@ -64,6 +64,7 @@ function propPicker({ player, team, opp, game, stats, lines, estimate, rows }) {
       candidates[id] = {
         id, player, team, opp, gameId: game.id, date: game.date.toISOString(),
         stat: s.label, side, line: l.line, odds, est: Math.round(est * 10) / 10, yes: !!l.yes,
+        playerId, gradeKey: s.statKey, league: state.league,
         l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`, on: true,
       };
       const inSlip = slip.legs.some((x) => x.id === id);
@@ -159,20 +160,8 @@ function renderSlip() {
       <button id="slip-save" class="btn primary">Save slip</button>
       <button id="slip-clear" class="btn">Clear</button>
     </div>
-    ${savedHtml()}` : `<p class="status">Your slip is empty. Open a player and tap Over or Under to add a leg.</p>${savedHtml()}`;
-}
-
-function savedHtml() {
-  if (!slip.saved.length) return "";
-  return `<h3 class="pick-title">Saved slips</h3>${slip.saved.map((s, i) => `
-    <div class="saved">
-      <div><b>${new Date(s.at).toLocaleDateString([], { month: "short", day: "numeric" })}</b> · ${s.legs.length} legs · ${money(s.stake)} pays ${money(s.payout)}</div>
-      <small>${s.legs.map((l) => `${l.player} ${legText(l)}`).join(" · ")}</small>
-      <div class="settings-actions">
-        <button class="btn" data-load-slip="${i}">Load</button>
-        <button class="btn" data-delete-slip="${i}">Delete</button>
-      </div>
-    </div>`).join("")}`;
+    ${slip.justSaved ? `<p class="note">Saved ✓ Find it under 📋 My slips, where you can edit lines and track results.</p>` : ""}` : `<p class="status">Your slip is empty. Open a player and tap Over or Under to add a leg.</p>`;
+  slip.justSaved = false;
 }
 
 $("slip-bar").addEventListener("click", openSlip);
@@ -189,18 +178,15 @@ $("sheet-body").addEventListener("click", (e) => {
     if (leg) leg.on = !leg.on;
   } else if (d.removeLeg) {
     slip.legs = slip.legs.filter((x) => x.id !== d.removeLeg);
-  } else if (d.loadSlip) {
-    const s = slip.saved[+d.loadSlip];
-    slip.legs = s.legs.map((l) => ({ ...l }));
-    slip.stake = s.stake;
-  } else if (d.deleteSlip) {
-    slip.saved.splice(+d.deleteSlip, 1);
-    saveList("pb.saved", slip.saved);
   } else if (t.id === "slip-save") {
     const m = slipMath(slip.legs);
     if (!m.on.length) return;
-    slip.saved.unshift({ at: Date.now(), stake: slip.stake, payout: m.payout, legs: m.on.map((l) => ({ ...l })) });
+    slip.saved.unshift({
+      id: String(Date.now()), at: Date.now(), stake: slip.stake, book: "FanDuel",
+      legs: m.on.map((l) => ({ ...l, result: "pending" })),
+    });
     saveList("pb.saved", slip.saved);
+    slip.justSaved = true;
   } else if (t.id === "slip-clear") {
     slip.legs = [];
   } else {

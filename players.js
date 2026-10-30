@@ -132,10 +132,10 @@ async function renderGame() {
 }
 
 // Gamelog → rows sorted newest first, each { date, opp, atVs, result, stats: {name: number} }.
-async function loadGameLog(playerId) {
-  const key = `${state.league}:${playerId}`;
-  if (sheet.logs[key]) return sheet.logs[key];
-  const data = await getJSON(`${WEB}${LEAGUES[state.league].path}/athletes/${playerId}/gamelog`);
+async function loadGameLog(playerId, league = state.league, fresh = false) {
+  const key = `${league}:${playerId}`;
+  if (sheet.logs[key] && !fresh) return sheet.logs[key];
+  const data = await getJSON(`${WEB}${LEAGUES[league].path}/athletes/${playerId}/gamelog`);
   const names = data.names || [];
   const rows = [];
   const seen = new Set();
@@ -169,6 +169,7 @@ async function loadGameLog(playerId) {
         stats.dd = ["points", "totalRebounds", "assists", "steals", "blocks"]
           .filter((k) => (stats[k] || 0) >= 10).length >= 2 ? 1 : 0;
         rows.push({
+          eventId: ev.eventId,
           date: new Date(meta.gameDate),
           opp: meta.opponent?.abbreviation || "",
           atVs: meta.atVs || "",
@@ -292,7 +293,7 @@ async function openPlayer(playerId) {
         </table>
       </div>
       <p class="note">Estimate = 60% last 5 + 40% season, scaled for this opponent. ${linesNote}</p>
-      ${propPicker({ player: p.name, team: team.abbr, opp: opp.abbr, game: g, stats, lines, estimate, rows })}`;
+      ${propPicker({ player: p.name, playerId, team: team.abbr, opp: opp.abbr, game: g, stats, lines, estimate, rows })}`;
     matchupFor(opp.id, p.pos).then((mu) => {
       const box = $("matchup-warn");
       if (!mu || !box || sheet.game !== g) return;

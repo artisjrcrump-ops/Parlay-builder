@@ -403,3 +403,59 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .good-banner { background: rgba(34, 197, 94, 0.12); color: var(--good); border-radius: 8px; padding: 8px 10px; margin: 0 0 12px; }
 #matchup-warn .inj-banner { margin: 0 0 12px; }
 .top-actions { margin-top: 12px; }
+
+.saved.won { border-color: rgba(34, 197, 94, 0.6); }
+.saved.lost { border-color: rgba(239, 68, 68, 0.5); }
+.saved-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.saved-row select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px;
+}
+
+.badge { font-size: 12px; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
+.badge.pending { color: var(--muted); border: 1px solid var(--line); }
+.badge.won { color: var(--good); border: 1px solid rgba(34, 197, 94, 0.5); }
+.badge.lost { color: var(--bad); border: 1px solid rgba(239, 68, 68, 0.5); }
+.badge.push { color: var(--mid); border: 1px solid rgba(234, 179, 8, 0.5); }
+
+.sleg {
+  display: grid;
+  grid-template-columns: 34px 1fr 64px;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  font-size: 14px;
+}
+.sleg small { color: var(--muted); }
+
+.num {
+  width: 56px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 5px;
+  font: inherit;
+  font-size: 16px;
+}
+.num.odds { width: 64px; text-align: right; }
+
+.res {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.res.won { background: var(--good); border-color: var(--good); color: #fff; }
+.res.lost { background: var(--bad); border-color: var(--bad); color: #fff; }
+.res.push, .res.void { border-color: var(--mid); color: var(--mid); }
+
+.record { margin-top: 12px; }

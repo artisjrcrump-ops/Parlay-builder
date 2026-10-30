@@ -101,7 +101,7 @@ async function scorePlayer(g, p, totalPct = 0.5) {
       out.push({
         id: `${g.id}|${p.name}|${label}|${side}`,
         player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
-        stat: label, statKey: key, side, line: l.line, odds, dec, yes: !!l.yes,
+        stat: label, statKey: key, gradeKey: statKey, league: state.league, side, line: l.line, odds, dec, yes: !!l.yes,
         est: Math.round(est * 10) / 10, l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`,
         l5Rate: h.l5 / h.l5n, prob, value, edgeAbs: Math.abs(edge) / Math.max(l.line, 5), // tiny lines don't count as big edges
         oppDefPct, oppDef: opp.def, oppN: opp.n, totalPct,
@@ -232,9 +232,10 @@ $("sheet-body").addEventListener("click", (e) => {
   const chosen = which === "all" ? sheet.autoParlays : [sheet.autoParlays[+which]];
   // Add to whatever is already in the slip; every leg starts checked so you can uncheck the ones you don't want.
   for (const p of chosen) {
-    for (const { id, player, team, opp, gameId, date, stat, side, line, odds, est, l5, season, yes } of p.legs) {
-      if (slip.legs.some((x) => x.id === id)) continue;
-      slip.legs.push({ id, player, team, opp, gameId, date, stat, side, line, odds, est, l5, season, yes, group: p.name, on: true });
+    for (const l of p.legs) {
+      if (slip.legs.some((x) => x.id === l.id)) continue;
+      const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes } = l;
+      slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes, group: p.name, on: true });
     }
   }
   persist();
