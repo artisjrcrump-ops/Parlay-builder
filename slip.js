@@ -36,7 +36,8 @@ function american(dec) {
 }
 
 function money(n) {
-  return n >= 1000 ? `$${Math.round(n).toLocaleString()}` : `$${n.toFixed(2)}`;
+  if (n >= 1000 || Number.isInteger(n)) return `$${Math.round(n).toLocaleString()}`;
+  return `$${n.toFixed(2)}`;
 }
 
 function hits(rows, key, side, line) {
