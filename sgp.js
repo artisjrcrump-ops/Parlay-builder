@@ -75,7 +75,7 @@ async function sgpCandidates(g, progress) {
     const roster = await loadRoster(g[side].id);
     roster.forEach((p) => players.push({ ...p, side, injury: injuries[p.id] }));
   }
-  if (sportOf(state.league) === "basketball") await loadSlateDvp().catch(() => null);
+  await loadSlateDvp().catch(() => null);
 
   let done = 0;
   const results = await pool(players, 6, async (p) => {

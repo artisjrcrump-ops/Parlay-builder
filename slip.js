@@ -49,13 +49,18 @@ function hits(rows, key, side, line) {
 // HTML for the Over/Under buttons on a player page.
 function propPicker({ player, team, opp, game, stats, lines, estimate, rows }) {
   if (!lines || !Object.keys(lines).length) return "";
-  const rowsHtml = stats.filter((s) => lines[s.key]).map((s) => {
+  // Stat props from the table columns, plus yes-only props like Anytime TD that score a column stat.
+  const items = [
+    ...stats.filter((s) => lines[s.key]).map((s) => ({ key: s.key, statKey: s.key, label: s.label })),
+    ...Object.entries(lines).filter(([, l]) => l.statKey).map(([key, l]) => ({ key, statKey: l.statKey, label: l.label })),
+  ];
+  const rowsHtml = items.map((s) => {
     const l = lines[s.key];
-    const est = estimate(s.key);
+    const est = estimate(s.statKey);
     const btn = (side, odds) => {
       if (odds == null) return "";
       const id = `${game.id}|${player}|${s.key}|${side}`;
-      const h = hits(rows, s.key, side, l.line);
+      const h = hits(rows, s.statKey, side, l.line);
       candidates[id] = {
         id, player, team, opp, gameId: game.id, date: game.date.toISOString(),
         stat: s.label, side, line: l.line, odds, est: Math.round(est * 10) / 10,
@@ -64,10 +69,10 @@ function propPicker({ player, team, opp, game, stats, lines, estimate, rows }) {
       const inSlip = slip.legs.some((x) => x.id === id);
       const lean = side === "over" ? est > l.line : est < l.line;
       return `<button class="pick ${inSlip ? "added" : ""} ${lean ? "lean" : ""}" data-add-leg="${id}">
-          ${side === "over" ? "O" : "U"} ${l.line} <small>${odds}</small><br><small>L5 ${h.l5}/${h.l5n}</small>
+          ${l.yes ? "Yes" : `${side === "over" ? "O" : "U"} ${l.line}`} <small>${odds}</small><br><small>L5 ${h.l5}/${h.l5n}</small>
         </button>`;
     };
-    return `<div class="pick-row"><span class="pick-stat">${s.label}<br><small>est ${fmt(est, s.key)}</small></span>${btn("over", l.over)}${btn("under", l.under)}</div>`;
+    return `<div class="pick-row"><span class="pick-stat">${s.label}<br><small>est ${fmt(est, s.statKey)}</small></span>${btn("over", l.over)}${btn("under", l.under)}</div>`;
   }).join("");
   return `<h3 class="pick-title">Add to slip</h3>${rowsHtml}
     <p class="note">Highlighted side is where the estimate leans. L5 = times it hit in the last 5 games.</p>`;
@@ -87,6 +92,11 @@ function toggleCandidate(id, btn) {
     btn.classList.add("added");
   }
   persist();
+}
+
+function legText(l) {
+  if (/TD/.test(l.stat) && !/Pass|Rush|Rec/.test(l.stat)) return l.stat; // "Anytime TD", "2+ TDs"
+  return `${l.side === "over" ? "Over" : "Under"} ${l.line} ${l.stat}`;
 }
 
 function slipMath(legs) {
@@ -124,7 +134,7 @@ function renderSlip() {
     <div class="leg ${l.on ? "" : "off"}">
       <button class="leg-toggle" data-toggle-leg="${l.id}" aria-label="Include leg">${l.on ? "✓" : ""}</button>
       <div class="leg-main">
-        <div><b>${l.player}</b> ${l.side === "over" ? "Over" : "Under"} ${l.line} ${l.stat}</div>
+        <div><b>${l.player}</b> ${legText(l)}</div>
         <small>${l.team} vs ${l.opp} · est ${l.est} · L5 ${l.l5} · season ${l.season}</small>
       </div>
       <span class="leg-odds">${l.odds}</span>
@@ -153,7 +163,7 @@ function savedHtml() {
   return `<h3 class="pick-title">Saved slips</h3>${slip.saved.map((s, i) => `
     <div class="saved">
       <div><b>${new Date(s.at).toLocaleDateString([], { month: "short", day: "numeric" })}</b> · ${s.legs.length} legs · ${money(s.stake)} pays ${money(s.payout)}</div>
-      <small>${s.legs.map((l) => `${l.player} ${l.side === "over" ? "O" : "U"}${l.line} ${l.stat}`).join(" · ")}</small>
+      <small>${s.legs.map((l) => `${l.player} ${legText(l)}`).join(" · ")}</small>
       <div class="settings-actions">
         <button class="btn" data-load-slip="${i}">Load</button>
         <button class="btn" data-delete-slip="${i}">Delete</button>

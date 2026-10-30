@@ -70,12 +70,13 @@ async function scorePlayer(g, p, totalPct = 0.5) {
   const mu = await matchupFor(opp.id, p.pos).catch(() => null);
   const out = [];
   for (const [key, l] of Object.entries(lines)) {
-    const est = (0.6 * avg(last5, key) + 0.4 * avg(rows, key)) * factor;
+    const statKey = l.statKey || key;
+    const est = (0.6 * avg(last5, statKey) + 0.4 * avg(rows, statKey)) * factor;
     for (const side of ["over", "under"]) {
       const odds = side === "over" ? l.over : l.under;
       const dec = decimal(odds);
-      if (!dec || dec < ODDS_RANGE[0] || dec > ODDS_RANGE[1]) continue;
-      const h = hits(rows, key, side, l.line);
+      if (!dec || dec < ODDS_RANGE[0] || dec > (l.maxDec || ODDS_RANGE[1])) continue;
+      const h = hits(rows, statKey, side, l.line);
       const edge = side === "over" ? est - l.line : l.line - est;
       const edgePct = l.line ? edge / l.line : 0;
       const oppDefPct = opp.def && opp.n ? opp.def / opp.n : 0.5;
@@ -85,7 +86,7 @@ async function scorePlayer(g, p, totalPct = 0.5) {
         + 0.25 * (0.5 + Math.max(-0.3, Math.min(0.3, edgePct * 2))) + matchup
         - (p.injury ? 0.05 : 0);
       // Defense vs position: no scoring overs into a tough matchup; small nudges otherwise.
-      const scoring = ["points", "pra", "threes"].includes(key);
+      const scoring = ["points", "pra", "threes", "passingYards", "rushingYards", "receivingYards", "receptions", "anytimeTd", "twoTd"].includes(key);
       if (mu?.tough && scoring && side === "over") continue;
       if (mu?.tough && side === "under") prob += 0.03;
       if (mu?.soft && scoring && side === "over") prob += 0.03;
@@ -93,7 +94,7 @@ async function scorePlayer(g, p, totalPct = 0.5) {
       if (prob < 0.55 || value <= 0 || edge <= 0) continue;
       const label = { points: "PTS", totalRebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA",
         passingYards: "Pass Yds", passingTouchdowns: "Pass TD", rushingYards: "Rush Yds",
-        receptions: "Rec", receivingYards: "Rec Yds" }[key] || key;
+        receptions: "Rec", receivingYards: "Rec Yds", anytimeTd: "Anytime TD", twoTd: "2+ TDs" }[key] || key;
       out.push({
         id: `${g.id}|${p.name}|${label}|${side}`,
         player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
@@ -119,10 +120,8 @@ async function buildCandidates(progress) {
   const jobs = [];
   games.forEach((g, i) => (perGame[i] || []).forEach((p) => jobs.push({ g, p })));
 
-  if (sportOf(state.league) === "basketball") {
-    progress("Checking defense vs position for every team…");
-    await loadSlateDvp().catch(() => null);
-  }
+  progress("Checking defense vs position for every team…");
+  await loadSlateDvp().catch(() => null);
 
   let done = 0;
   const results = await pool(jobs, 6, async ({ g, p }) => {
@@ -187,7 +186,7 @@ function renderParlays(parlays, opts = {}) {
         <small class="auto-why">${p.why}</small>
         ${p.legs.map((l) => `
           <div class="auto-leg">
-            <div><b>${l.player}</b> ${l.side === "over" ? "Over" : "Under"} ${l.line} ${l.stat} <span class="muted">${l.team} vs ${l.opp}</span><br>
+            <div><b>${l.player}</b> ${legText(l)} <span class="muted">${l.team} vs ${l.opp}</span><br>
             <small>${reason(l)}</small></div>
             <span class="leg-odds">${l.odds}</span>
           </div>`).join("")}

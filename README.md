@@ -13,7 +13,8 @@ A phone-first web app for building player-prop parlays.
 - Slip builder: tap Over/Under on a player to add a leg, tap legs on and off, set your stake, and see the payout against a $400–$2,500 target (with a same-game warning)
 - Save slips on your device and load them again later
 - 🎯 Same-game parlays: pick a game (or tap the button inside a game) for 5 SGPs, each following one game script (shootout, favorite rolls, underdog hangs around, grind it out, best value), with no shared picks
-- Defense vs position (basketball): warns when tonight's opponent holds a player's position (G/F/C) 15%+ below the slate average over its last 5 games
+- Defense vs position: basketball compares points allowed to guards/forwards/centers; football compares passing yards allowed (QB/WR/TE) and rushing yards allowed (RB). Warns at 15%+ below the slate average over the last 5 games
+- Football: Anytime TD and 2+ TDs props (Yes bets) alongside yardage and reception props
 - ⚡ Auto parlays: 5 themed parlays (weak defense overs, hot hands, shootout games, lockdown unders, best value) built from the day's FanDuel props, with no pick shared between them, sized toward your payout target
 
 ## Coming next

@@ -42,13 +42,19 @@ function writeCache(key, data) {
   try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch { /* quota or private mode */ }
 }
 
+function trimLine(fd) {
+  if (!fd) return fd;
+  const alt = Array.isArray(fd.altLines) ? fd.altLines.map((a) => ({ odds: a.odds, overUnder: a.overUnder })) : undefined;
+  return { odds: fd.odds, overUnder: fd.overUnder, available: fd.available, altLines: alt };
+}
+
 // One request per league per day, cached, to stay inside the free monthly allowance.
 async function loadOddsEvents(game) {
   const key = oddsKey();
   if (!key) return null;
   const league = SGO_LEAGUE[state.league];
   const day = ymd(game.date);
-  const cacheKey = `pb.sgo.${league}.${day}`;
+  const cacheKey = `pb.odds.${league}.${day}`;
   const cached = readCache(cacheKey);
   if (cached) return cached;
 
@@ -57,7 +63,8 @@ async function loadOddsEvents(game) {
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
   const url = `${SGO}?leagueID=${league}&bookmakerID=fanduel&startsAfter=${start.toISOString()}`
-    + `&startsBefore=${end.toISOString()}&limit=100&apiKey=${encodeURIComponent(key)}`;
+    + `&startsBefore=${end.toISOString()}&limit=100&apiKey=${encodeURIComponent(key)}`
+    + (sportOf(state.league) === "football" ? "&includeAltLines=true" : ""); // 2+ TD lines can be alternates
   const res = await fetch(url);
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body.success === false) throw new Error(body.error || `HTTP ${res.status}`);
@@ -68,8 +75,8 @@ async function loadOddsEvents(game) {
     away: ev.teams?.away?.names?.long || "",
     players: Object.fromEntries(Object.values(ev.players || {}).map((p) => [norm(p.name), p.playerID])),
     lines: Object.fromEntries(Object.entries(ev.odds || {})
-      .filter(([id]) => id.endsWith("-game-ou-over") || id.endsWith("-game-ou-under"))
-      .map(([id, o]) => [id, o.byBookmaker?.fanduel])
+      .filter(([id]) => /-game-(ou-over|ou-under|yn-yes)$/.test(id))
+      .map(([id, o]) => [id, trimLine(o.byBookmaker?.fanduel)])
       .filter(([, fd]) => fd && fd.available !== false)),
   }));
   writeCache(cacheKey, events);
@@ -79,6 +86,23 @@ async function loadOddsEvents(game) {
 function teamMatches(sgoName, espnTeam) {
   const n = norm(sgoName);
   return n === norm(espnTeam.full) || (espnTeam.name && n.endsWith(norm(espnTeam.name)));
+}
+
+// Anytime TD and 2+ TDs, from a yes/no market or the touchdowns over/under ladder.
+function touchdownLines(ev, pid) {
+  const ladder = {};
+  const yes = ev.lines[`touchdowns-${pid}-game-yn-yes`];
+  if (yes?.odds) ladder[0.5] = yes.odds;
+  const ou = ev.lines[`touchdowns-${pid}-game-ou-over`];
+  for (const l of ou ? [ou, ...(ou.altLines || [])] : []) {
+    const line = parseFloat(l.overUnder);
+    if (Number.isFinite(line) && l.odds && !(line in ladder)) ladder[line] = l.odds;
+  }
+  const out = {};
+  const td = { under: null, statKey: "tds", yes: true };
+  if (ladder[0.5]) out.anytimeTd = { ...td, line: 0.5, over: ladder[0.5], label: "Anytime TD", maxDec: 4 };
+  if (ladder[1.5]) out.twoTd = { ...td, line: 1.5, over: ladder[1.5], label: "2+ TDs", maxDec: 12 };
+  return out;
 }
 
 // Returns { statKey: { line, over, under } } for this player, or null when unavailable.
@@ -96,6 +120,7 @@ async function getPlayerLines(game, playerName) {
     if (!over && !under) continue;
     out[statKey] = { line: parseFloat((over || under).overUnder), over: over?.odds, under: under?.odds };
   }
+  Object.assign(out, touchdownLines(ev, pid));
   return out;
 }
 
@@ -128,7 +153,7 @@ $("sheet-body").addEventListener("click", (e) => {
     if (!v || v === "••••••••") return;
     savePref("sgoKey", v);
     try {
-      Object.keys(localStorage).filter((k) => k.startsWith("pb.sgo.")).forEach((k) => localStorage.removeItem(k));
+      Object.keys(localStorage).filter((k) => k.startsWith("pb.odds.")).forEach((k) => localStorage.removeItem(k));
     } catch { /* no storage */ }
     $("sgo-msg").textContent = "Saved. FanDuel lines will show on player pages.";
   } else if (e.target.id === "sgo-clear") {

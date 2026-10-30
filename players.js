@@ -17,6 +17,7 @@ const KEY_STATS = {
     { key: "receptions", label: "Rec" },
     { key: "receivingYards", label: "Rec Yds" },
     { key: "receivingTouchdowns", label: "Rec TD" },
+    { key: "tds", label: "TDs" },
   ],
 };
 
@@ -149,6 +150,7 @@ async function loadGameLog(playerId) {
         });
         stats.threes = stats.threePointFieldGoalsMade ?? 0;
         stats.pra = (stats.points || 0) + (stats.totalRebounds || 0) + (stats.assists || 0);
+        stats.tds = (stats.rushingTouchdowns || 0) + (stats.receivingTouchdowns || 0);
         rows.push({
           date: new Date(meta.gameDate),
           opp: meta.opponent?.abbreviation || "",
@@ -199,6 +201,7 @@ async function openPlayer(playerId) {
     const { rows, names } = await loadGameLog(playerId);
     if (sheet.game !== g) return;
     const has = new Set([...names.map((n) => n.split("-")[0]), "threes", "pra"]);
+    if (has.has("rushingTouchdowns") || has.has("receivingTouchdowns")) has.add("tds");
     let stats = KEY_STATS[sportOf(state.league)].filter((s) => has.has(s.key));
     if (sportOf(state.league) === "basketball") stats = KEY_STATS.basketball;
     if (!rows.length) {
@@ -235,12 +238,17 @@ async function openPlayer(playerId) {
     const estimate = (key) => (0.6 * avg(last5, key) + 0.4 * avg(rows, key)) * factor;
     const fdRow = lines ? `
       <tr class="fd"><td>FanDuel<br><small>line</small></td>${stats.map((s) => {
+        if (s.key === "tds") {
+          const a = lines.anytimeTd;
+          const t = lines.twoTd;
+          return `<td>${a || t ? `${a ? `ATD ${a.over}` : ""}<br><small>${t ? `2+ ${t.over}` : ""}</small>` : "–"}</td>`;
+        }
         const l = lines[s.key];
         return `<td>${l ? `${l.line}<br><small>${l.over ?? ""}/${l.under ?? ""}</small>` : "–"}</td>`;
       }).join("")}</tr>
       <tr class="edge"><td>Est. vs line</td>${stats.map((s) => {
         const l = lines[s.key];
-        if (!l) return "<td></td>";
+        if (!l || s.key === "tds") return "<td></td>";
         const d = estimate(s.key) - l.line;
         return `<td class="${d >= 0 ? "up" : "down"}">${d >= 0 ? "+" : ""}${fmt(d, s.key)}</td>`;
       }).join("")}</tr>` : "";
@@ -269,7 +277,7 @@ async function openPlayer(playerId) {
     matchupFor(opp.id, p.pos).then((mu) => {
       const box = $("matchup-warn");
       if (!mu || !box || sheet.game !== g) return;
-      if (mu.tough) box.innerHTML = `<p class="inj-banner">Tough matchup: ${opp.name} ${mu.label}. Think twice about points overs.</p>`;
+      if (mu.tough) box.innerHTML = `<p class="inj-banner">Tough matchup: ${opp.name} ${mu.label}. Think twice about ${sportOf(state.league) === "football" ? "yardage and TD" : "points"} overs.</p>`;
       else if (mu.soft) box.innerHTML = `<p class="good-banner">Good matchup: ${opp.name} ${mu.label}.</p>`;
       else box.innerHTML = `<p class="note">Position matchup: ${opp.name} ${mu.label}.</p>`;
     }).catch(() => {});
