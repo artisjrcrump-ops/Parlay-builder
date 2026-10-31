@@ -65,6 +65,7 @@ function trimLine(fd, dk) {
 // Bet-slip links by game, player, side and line, filled as props load; slip legs pick them up
 // (persist in slip.js) so "Place on FanDuel / DraftKings" can open the book with the picks in it.
 const BET_LINKS = {};
+const GAME_DK = {}; // DraftKings game page, for when it has no bet-slip link for a line
 const linkKey = (gameId, player, side, line) => `${gameId}|${norm(player)}|${side}|${parseFloat(line)}`;
 
 function noteLinks(game, player, stat, side, o) {
@@ -80,10 +81,10 @@ function noteLinks(game, player, stat, side, o) {
 }
 
 function betLinksFor(leg) {
-  const list = BET_LINKS[linkKey(leg.gameId, leg.player, leg.side === "under" ? "under" : "over", leg.line)];
-  if (!list) return null;
+  const list = BET_LINKS[linkKey(leg.gameId, leg.player, leg.side === "under" ? "under" : "over", leg.line)] || [];
   const hit = list.find((x) => x.stat === leg.gradeKey) || (list.length === 1 ? list[0] : null);
-  return hit ? { fd: hit.fd || null, dk: hit.dk || null } : null;
+  const dkGame = GAME_DK[leg.gameId] || null;
+  return hit || dkGame ? { fd: hit?.fd || null, dk: hit?.dk || null, dkGame } : null;
 }
 
 // One request per league per day, cached, to stay inside the free monthly allowance.
@@ -92,7 +93,7 @@ async function loadOddsEvents(game) {
   if (!key) return null;
   const league = SGO_LEAGUE[state.league];
   const day = ymd(game.date);
-  const cacheKey = `pb.odds.v2.${league}.${day}`;
+  const cacheKey = `pb.odds.v3.${league}.${day}`;
   const cached = readCache(cacheKey);
   if (cached) return cached;
 
@@ -111,6 +112,7 @@ async function loadOddsEvents(game) {
   const events = (body.data || []).map((ev) => ({
     home: ev.teams?.home?.names?.long || "",
     away: ev.teams?.away?.names?.long || "",
+    dkEvent: ev.links?.bookmakers?.draftkings || "",
     players: Object.fromEntries(Object.values(ev.players || {}).map((p) => [norm(p.name), p.playerID])),
     lines: Object.fromEntries(Object.entries(ev.odds || {})
       .filter(([id]) => /-game-(ou-over|ou-under|yn-yes)$/.test(id))
@@ -158,6 +160,7 @@ async function getPlayerLines(game, playerName) {
   if (!events) return null;
   const ev = events.find((e) => teamMatches(e.home, game.home) && teamMatches(e.away, game.away));
   if (!ev) return {};
+  if (ev.dkEvent) GAME_DK[game.id] = ev.dkEvent;
   const pid = ev.players[norm(playerName)];
   if (!pid) return {};
   const out = {};

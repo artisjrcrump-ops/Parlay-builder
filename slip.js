@@ -21,7 +21,7 @@ const slip = {
 
 function persist() {
   // Pick up FanDuel/DraftKings bet-slip links for new legs (odds.js) before saving.
-  if (typeof betLinksFor === "function") slip.legs.forEach((l) => { if (!l.links) l.links = betLinksFor(l) || undefined; });
+  if (typeof betLinksFor === "function") slip.legs.forEach((l) => { if (!l.links?.dkGame) l.links = betLinksFor(l) || l.links; });
   saveList("pb.slip", slip.legs);
   renderSlipBar();
 }
@@ -153,11 +153,14 @@ function placeButtons(legs) {
   if (!legs.length) return "";
   const fd = bookLink(legs, "fd");
   const dk = bookLink(legs, "dk");
-  if (!fd && !dk) return `<p class="note">No FanDuel/DraftKings bet-slip links for these legs yet (alternate and estimated lines usually don't have one). Reload the picks after props post, or add them in the app by hand.</p>`;
+  const dkGame = legs.find((l) => l.links?.dkGame)?.links.dkGame;
+  if (!fd && !dk && !dkGame) return `<p class="note">No FanDuel/DraftKings bet-slip links for these legs yet (alternate and estimated lines usually don't have one). Reload the picks after props post, or add them in the app by hand.</p>`;
   const btn = (b, name) => b ? `<a class="btn ${name === "FanDuel" ? "primary" : ""} place-btn" href="${b.url}" target="_blank" rel="noopener">Place it on ${name}${b.n < legs.length ? ` (${b.n} of ${legs.length})` : ""} ↗</a>` : "";
   const missing = legs.filter((l) => !l.links?.fd).map((l) => l.player);
   const tries = fd && fd.n > 1 ? `<p class="note">Not all legs added? Try link <a href="${fd.alts[0]}" target="_blank" rel="noopener">B</a> or <a href="${fd.alts[1]}" target="_blank" rel="noopener">C</a> (clear FanDuel's bet slip first) and tell me which one works.</p>` : "";
-  return `<div class="settings-actions place-row">${btn(fd, "FanDuel")}${btn(dk, "DraftKings")}</div>${tries}
+  return `<div class="settings-actions place-row">${btn(fd, "FanDuel")}${dk ? btn(dk, "DraftKings") : dkGame ? `<a class="btn place-btn" href="${dkGame}" target="_blank" rel="noopener">Open on DraftKings ↗</a>` : ""}</div>${tries}
+    ${!dk && dkGame ? `<p class="note">DraftKings didn't share bet-slip links for these exact lines (its lines often differ from FanDuel's), so that button opens the game on DraftKings to add picks there.</p>` : ""}
+    ${!dk && !dkGame ? `<p class="note">No DraftKings links came with these picks.</p>` : ""}
     ${missing.length && fd ? `<p class="note">Add by hand in FanDuel: ${missing.join(", ")}.</p>` : ""}
     <p class="note">If FanDuel says a selection wasn't added, one leg has closed or moved. Use FD↗ on each leg to add them one at a time.</p>`;
 }
