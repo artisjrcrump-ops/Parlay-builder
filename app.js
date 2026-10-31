@@ -177,6 +177,21 @@ function gameCard(g) {
     </article>`;
 }
 
+// Finished games leave the main list and show as a compact final score.
+function finalRow(g) {
+  const a = parseFloat(g.away.score) || 0;
+  const h = parseFloat(g.home.score) || 0;
+  const team = (t, win) => `<span class="${win ? "win" : ""}"><img src="${t.logo || ""}" alt="" loading="lazy">${t.abbr} ${t.score}</span>`;
+  return `<div class="final-row" data-game="${g.id}">${team(g.away, a > h)}<span class="muted">@</span>${team(g.home, h > a)}<small>${g.detail}</small></div>`;
+}
+
+function renderBoard(games) {
+  const active = games.filter((g) => g.state !== "post");
+  const done = games.filter((g) => g.state === "post");
+  $("games").innerHTML = active.map(gameCard).join("")
+    + (done.length ? `<details class="finals" ${active.length ? "" : "open"}><summary>Final scores (${done.length})</summary>${done.map(finalRow).join("")}</details>` : "");
+}
+
 function sortGames(games) {
   const worstDef = (g) => Math.max(g.away.def || 0, g.home.def || 0);
   const sorters = {
@@ -189,12 +204,18 @@ function sortGames(games) {
 
 let loadToken = 0;
 
-async function load() {
+let liveTimer = null;
+
+// quiet: background refresh during live games (keeps the list on screen while it reloads).
+async function load(quiet = false) {
   const token = ++loadToken;
   const key = state.league;
   const lg = LEAGUES[key];
-  $("status").textContent = "Loading…";
-  $("games").innerHTML = "";
+  clearTimeout(liveTimer);
+  if (!quiet) {
+    $("status").textContent = "Loading…";
+    $("games").innerHTML = "";
+  }
   $("refresh").classList.add("spinning");
   $("date-label").textContent = fmtDate(state.date);
 
@@ -207,10 +228,16 @@ async function load() {
     state.ranks[key] = ranks;
     const games = sortGames((board.events || []).map((ev) => parseGame(ev, ranks)));
     state.games = games;
-    $("games").innerHTML = games.map(gameCard).join("");
+    const open = $("games").querySelector(".finals")?.open;
+    renderBoard(games);
+    if (open) $("games").querySelector(".finals").open = true;
+    const live = games.filter((g) => g.state === "in").length;
+    const left = games.filter((g) => g.state !== "post").length;
     $("status").textContent = games.length
-      ? `${games.length} game${games.length === 1 ? "" : "s"} · updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+      ? `${left} game${left === 1 ? "" : "s"} left${live ? ` · ${live} live` : ""} · updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
       : "No games on this day.";
+    // While games are live, refresh every minute so finished ones drop off on their own.
+    if (live) liveTimer = setTimeout(() => { if (!document.hidden) load(true); }, 60 * 1000);
   } catch (err) {
     if (token !== loadToken) return;
     $("status").textContent = `Couldn't load games (${err.message}). Tap ↻ to try again.`;
@@ -242,7 +269,7 @@ $("leagues").addEventListener("click", (e) => {
 });
 $("prev-day").addEventListener("click", () => shiftDay(-1));
 $("next-day").addEventListener("click", () => shiftDay(1));
-$("refresh").addEventListener("click", load);
+$("refresh").addEventListener("click", () => load());
 $("sort").value = state.sort;
 $("sort").addEventListener("change", (e) => {
   state.sort = e.target.value;
@@ -252,3 +279,8 @@ $("sort").addEventListener("change", (e) => {
 
 renderTabs();
 load();
+
+// Coming back to the app: catch up on scores right away.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && (state.games || []).some((g) => g.state === "in")) load(true);
+});

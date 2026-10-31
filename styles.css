@@ -516,3 +516,12 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .actions-row { flex-wrap: wrap; }
 .actions-row .live-btn { flex-basis: 100%; background: #f97316; border-color: #f97316; }
 .actions-row [hidden] { display: none; }
+
+/* Finished games */
+.finals { margin: 12px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.finals summary { padding: 10px 12px; font-weight: 600; cursor: pointer; }
+.final-row { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 8px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+.final-row span { display: flex; align-items: center; gap: 6px; }
+.final-row img { width: 20px; height: 20px; }
+.final-row .win { color: var(--text); font-weight: 700; }
+.final-row small { font-size: 11px; }
