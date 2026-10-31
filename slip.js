@@ -155,11 +155,12 @@ function placeButtons(legs) {
   const fd = bookLink(legs, "fd");
   const dk = bookLink(legs, "dk");
   const dkGame = legs.find((l) => l.links?.dkGame)?.links.dkGame;
-  if (!fd && !dk && !dkGame) return `<p class="note">No FanDuel/DraftKings bet-slip links for these legs yet (alternate and estimated lines usually don't have one). Reload the picks after props post, or add them in the app by hand.</p>`;
+  if (!fd && !dk && !dkGame) return `<div class="settings-actions place-row"><button class="btn" data-copy-picks>📋 Copy picks</button></div><p class="note">No FanDuel/DraftKings bet-slip links for these legs yet (alternate and estimated lines usually don't have one). Reload the picks after props post, or add them in the app by hand.</p>`;
   const btn = (b, name) => b ? `<a class="btn ${name === "FanDuel" ? "primary" : ""} place-btn" href="${b.url}" target="_blank" rel="noopener">Place it on ${name}${b.n < legs.length ? ` (${b.n} of ${legs.length})` : ""} ↗</a>` : "";
   const missing = legs.filter((l) => !l.links?.fd).map((l) => l.player);
   const tries = fd && fd.n > 1 ? `<p class="note">Not all legs added? Try link <a href="${fd.alts[0]}" target="_blank" rel="noopener">B</a> or <a href="${fd.alts[1]}" target="_blank" rel="noopener">C</a> (clear FanDuel's bet slip first) and tell me which one works.</p>` : "";
-  return `<div class="settings-actions place-row">${btn(fd, "FanDuel")}${dk ? btn(dk, "DraftKings") : dkGame ? `<a class="btn place-btn" href="${dkGame}" target="_blank" rel="noopener">Open on DraftKings ↗</a>` : ""}</div>${tries}
+  const copy = `<button class="btn" data-copy-picks>📋 Copy picks</button>`;
+  return `<div class="settings-actions place-row">${copy}</div><div class="settings-actions place-row">${btn(fd, "FanDuel")}${dk ? btn(dk, "DraftKings") : dkGame ? `<a class="btn place-btn" href="${dkGame}" target="_blank" rel="noopener">Open on DraftKings ↗</a>` : ""}</div>${tries}
     ${!dk && dkGame ? `<p class="note">DraftKings didn't share bet-slip links for these exact lines (its lines often differ from FanDuel's), so that button opens the game on DraftKings to add picks there.</p>` : ""}
     ${!dk && !dkGame ? `<p class="note">No DraftKings links came with these picks.</p>` : ""}
     ${missing.length && fd ? `<p class="note">Add by hand in FanDuel: ${missing.join(", ")}.</p>` : ""}
@@ -216,6 +217,11 @@ $("sheet-body").addEventListener("click", (e) => {
   if (!t) return;
   const d = t.dataset;
   if (d.addLeg) return toggleCandidate(d.addLeg, t);
+  if ("copyPicks" in d) {
+    const text = slipMath(slip.legs).on.map((l) => `${l.player} ${legText(l)} (${l.odds})`).join("\n");
+    navigator.clipboard?.writeText(text).then(() => { t.textContent = "Copied ✓"; }, () => { t.textContent = "Couldn't copy"; });
+    return;
+  }
   if (d.checkAll) {
     slip.legs.forEach((l) => { l.on = d.checkAll === "on"; });
   } else if (d.toggleLeg) {
