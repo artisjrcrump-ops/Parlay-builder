@@ -72,6 +72,14 @@ function estimatePrice(l, sd, line, side) {
 // The best line for one prop, or null. Considers FanDuel's posted line, its alternates and
 // YourWay-style lines in whole steps toward the estimate's safe side; picks the one with the
 // best value (chance x payout) among lines that clear the hit-chance and edge floors.
+// FanDuel's "X+" ladders: 5s for points-type stats, 10s for yards, every number for the rest.
+function isMilestone(statKey, line) {
+  const n = line + 0.5;
+  if (["points", "pra", "pr", "pa"].includes(statKey)) return n % 5 === 0;
+  if (/Yards|rushRec/.test(statKey)) return n % 10 === 0;
+  return true;
+}
+
 // bank: Bank builder legs instead: short prices (about -150 to -900), likeliest line wins,
 // as long as the app's chance is at least what the price implies.
 function smartPick({ rows, statKey, est, l, mu, injury, yourWay = false, bank = false }) {
@@ -91,7 +99,10 @@ function smartPick({ rows, statKey, est, l, mu, injury, yourWay = false, bank = 
       const posted = step === 0 ? (side === "over" ? l.over : l.under) : null;
       const alt = l.alts?.[line]?.[side];
       // Lines FanDuel doesn't post only work as YourWay lines inside a same-game parlay.
-      const odds = posted || alt || (yourWay && step > 0 ? estimatePrice(l, sd, line, side) : null);
+      // Bank legs can also use FanDuel's "X+" milestone markets (e.g. 20+ points), which work
+      // in any parlay; when the feed doesn't carry them the price is estimated.
+      const milestone = bank && side === "over" && isMilestone(statKey, line);
+      const odds = posted || alt || ((yourWay || milestone) && step > 0 ? estimatePrice(l, sd, line, side) : null);
       const dec = decimal(odds);
       if (!dec || dec < 1.08 || (bank && dec > 1.67)) continue;
       let prob = sideProb(rows, statKey, est, sd, line, side) - (injury ? 0.05 : 0);

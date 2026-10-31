@@ -198,7 +198,7 @@ function reason(l) {
   const bits = [`est ${l.est}`, `hit ${l.l5} last 5`];
   if (l.oppDef) bits.push(`vs ${ordinal(l.oppDef)} D`);
   if (l.postedLine != null && l.line !== l.postedLine) bits.push(`FanDuel posted ${l.postedLine}`);
-  if (l.priceSource === "estimated") bits.push("YourWay line, price estimated");
+  if (l.priceSource === "estimated" && !l.bank) bits.push("YourWay line, price estimated");
   if (l.matchup) bits.push(l.matchup);
   if (l.injury) bits.push(l.injury);
   return bits.join(" · ");

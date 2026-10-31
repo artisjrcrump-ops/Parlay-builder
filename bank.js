@@ -110,7 +110,8 @@ function renderBank(cands, note = "") {
         ${p.legs.map((c) => `
           <div class="auto-leg">
             <div><b>${c.player}</b> ${legText(c)} <span class="muted">${c.team} vs ${c.opp}</span><br>
-            <small>hits ~${Math.round(c.prob * 100)}% · ${reason(c)}</small></div>
+            <small>hits ~${Math.round(c.prob * 100)}% · ${reason(c)}</small>
+            ${c.priceSource === "estimated" ? `<small class="muted">FanDuel "${c.line + 0.5}+ ${c.stat}" market · price estimated, check it in FanDuel</small>` : ""}</div>
             <span class="leg-odds">${c.odds}</span>
           </div>`).join("")}
         <button class="btn primary" data-bank-use="${i}">Bet this (${money(l.bank)})</button>
