@@ -132,10 +132,10 @@ async function renderGame() {
 }
 
 // Gamelog → rows sorted newest first, each { date, opp, atVs, result, stats: {name: number} }.
-async function loadGameLog(playerId, league = state.league, fresh = false) {
-  const key = `${league}:${playerId}`;
+async function loadGameLog(playerId, league = state.league, fresh = false, season = "") {
+  const key = `${league}:${playerId}${season ? `:${season}` : ""}`;
   if (sheet.logs[key] && !fresh) return sheet.logs[key];
-  const data = await getJSON(`${WEB}${LEAGUES[league].path}/athletes/${playerId}/gamelog`);
+  const data = await getJSON(`${WEB}${LEAGUES[league].path}/athletes/${playerId}/gamelog${season ? `?season=${season}` : ""}`);
   const names = data.names || [];
   const rows = [];
   const seen = new Set();
@@ -180,7 +180,8 @@ async function loadGameLog(playerId, league = state.league, fresh = false) {
     }
   }
   rows.sort((a, b) => b.date - a.date);
-  sheet.logs[key] = { rows, names };
+  const seasonNow = parseInt((data.filters || []).find((f) => f.name === "season")?.value, 10) || null;
+  sheet.logs[key] = { rows, names, season: seasonNow };
   return sheet.logs[key];
 }
 

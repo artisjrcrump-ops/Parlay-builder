@@ -9,7 +9,7 @@
 const CHEAT = {};
 const CHEAT_SHOW = 10;
 
-function cheatNote({ g, p, team, opp, key, statKey, l, rows, label, tough }) {
+function cheatNote({ g, p, team, opp, key, statKey, l, rows, season, label, tough }) {
   if (!Number.isFinite(l.line) || !l.over) return;
   const base = {
     player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
@@ -23,7 +23,11 @@ function cheatNote({ g, p, team, opp, key, statKey, l, rows, label, tough }) {
   // Highest rung cleared every game, still worth a leg (about -1000 to -105).
   const rung = altLadder({ rows, statKey, l, opp: opp.abbr, home: p.side === "home" })
     .filter((s) => s.n >= 5 && s.all === s.n && s.dec && s.dec >= 1.1 && s.dec <= 1.95).pop();
+  // Versus opponent also looks back two seasons (filled in fillVsOpponent before showing).
+  const pend = h.n && h.all / h.n >= 0.6
+    ? { playerId: p.id, league: state.league, statKey, line: l.line, opp: opp.abbr, cur: vs, season } : null;
   CHEAT[main.id] = {
+    pend, main: { ...main, rate: h.all / h.n },
     form: h.l5n >= 5 && h.l5 === h.l5n ? { ...main, hit: h.l5, of: h.l5n, rate: h.all / h.n } : null,
     vs: vs.length >= 2 && vsHit === vs.length ? { ...main, hit: vsHit, of: vs.length, rate: h.all / h.n } : null,
     alt: rung ? {
@@ -32,6 +36,34 @@ function cheatNote({ g, p, team, opp, key, statKey, l, rows, label, tough }) {
       hit: rung.all, of: rung.n, dec: rung.dec,
     } : null,
   };
+}
+
+// Games against tonight's opponent from this season and the two before, for main lines
+// that hit 60%+ this season. One request per player per past season, a few at a time.
+const VS_MAX_PLAYERS = 80;
+async function fillVsOpponent(progress) {
+  const todo = Object.values(CHEAT).filter((c) => c.pend && !c.vsDone);
+  const players = [...new Map(todo.map((c) => [`${c.pend.league}:${c.pend.playerId}`, c.pend])).values()].slice(0, VS_MAX_PLAYERS);
+  const past = {};
+  let done = 0;
+  const one = async (pd) => {
+    const now = pd.season || (await loadGameLog(pd.playerId, pd.league).catch(() => ({}))).season;
+    const logs = now ? await Promise.all([now - 1, now - 2].map((y) =>
+      loadGameLog(pd.playerId, pd.league, false, y).then((r) => r.rows).catch(() => []))) : [];
+    past[`${pd.league}:${pd.playerId}`] = logs.flat();
+    progress?.(`Checking past games vs tonight's opponents… ${++done}/${players.length}`);
+  };
+  for (let i = 0; i < players.length; i += 6) await Promise.all(players.slice(i, i + 6).map(one));
+  for (const c of todo) {
+    const pd = c.pend;
+    const old = past[`${pd.league}:${pd.playerId}`];
+    if (!old) continue;
+    c.vsDone = true;
+    const seen = new Set(pd.cur.map((r) => r.eventId));
+    const games = [...pd.cur, ...old.filter((r) => r.opp === pd.opp && !seen.has(r.eventId))];
+    const hit = games.filter((r) => (r.stats[pd.statKey] || 0) > pd.line).length;
+    c.vs = games.length >= 2 && hit === games.length ? { ...c.main, hit, of: games.length } : null;
+  }
 }
 
 function cheatLists(cands) {
@@ -84,6 +116,7 @@ async function openCheats() {
     const r = await sportsCandidates(status);
     if (!r) return;
     if (!r.games) return status("No upcoming games on this day. Use ‹ › on the main screen to change the day.");
+    await fillVsOpponent(status);
     renderCheats(cheatLists(r.all), r.failed.length ? `<p class="note">Couldn't load ${r.failed.join(", ")}.</p>` : "");
   } catch (err) {
     status(`Couldn't build cheatsheets (${err.message}).`);
