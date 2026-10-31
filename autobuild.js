@@ -143,6 +143,20 @@ async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
         matchup: mu && (mu.tough || mu.soft) ? (mu.tough ? "tough matchup" : "soft matchup") : "",
       });
     }
+    // FanDuel "X+" alternate line this player keeps clearing (alttrends.js).
+    const at = l.yes ? null : altTrend({ rows, statKey, l, opp: opp.abbr, home: p.side === "home" });
+    if (at) {
+      out.push({
+        id: `${g.id}|${p.name}|${PROP_LABEL[key] || key}|over|alt${at.thr}`, alt: true, smart: true,
+        player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
+        away: g.away.abbr, home: g.home.abbr,
+        stat: PROP_LABEL[key] || key, statKey: key, gradeKey: statKey, league: state.league, yes: false,
+        side: "over", line: at.line, thr: at.thr, odds: at.odds, dec: at.dec, source: at.source, priceSource: at.source,
+        prob: at.all / at.n, value: 0, est: Math.round(est * 10) / 10,
+        l5Hits: at.l5, l5n: at.l5n, allHits: at.all, n: at.n, vsHits: at.vs, vsn: at.vsn, haHits: at.ha, han: at.han,
+        l5: `${at.l5}/${at.l5n}`, season: `${at.all}/${at.n}`, on: true,
+      });
+    }
     // A short-priced version of this prop for the Bank builder (bank.js).
     const safe = l.yes ? null : smartPick({ rows, statKey, est, l, mu, injury: p.injury, bank: true });
     if (safe) {
@@ -315,11 +329,11 @@ function renderParlays(parlays, opts = {}) {
 
 const AUTO_MODES = {
   basketball: [
-    ["smart", "Best lines pool"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
+    ["smart", "Best lines pool"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
     ["assists", "Assists"], ["points", "Points"], ["pra", "Pts + Reb + Ast"],
   ],
   football: [
-    ["smart", "Best lines pool"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
+    ["smart", "Best lines pool"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
     ["rushingYards", "Rushing yards"], ["receivingYards", "Receiving yards"], ["receptions", "Receptions"],
   ],
 };
@@ -376,6 +390,7 @@ function renderAuto() {
     .map(([k, l]) => `<option value="${k}" ${k === mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>${skippedNote(all)}`;
   sheet.smart = null;
   if (mode === "smart") return renderSmart(header, all);
+  if (mode === "alt") return renderAltTrends(header, all);
   const cands = postedOnly(all);
   const parlays = mode === "mixed" ? buildParlays(cands)
     : mode === "blowout" ? buildStatParlays(cands, null, "Blowout bench", (c) => c.bench && (c.side === "over" || c.yes))

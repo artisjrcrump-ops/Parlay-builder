@@ -525,3 +525,11 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .final-row img { width: 20px; height: 20px; }
 .final-row .win { color: var(--text); font-weight: 700; }
 .final-row small { font-size: 11px; }
+
+/* Alternate lines */
+.alt-leg { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; padding: 4px 0; }
+.sigs { display: grid; gap: 4px; border-top: 1px solid var(--line); padding-top: 8px; }
+.sig { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.sig b { color: var(--text); }
+.alt-table .alt-head td { text-align: left; background: var(--bg); font-size: 12px; }
+.alt-table .alt-hot td { color: #22c55e; font-weight: 600; }

@@ -205,6 +205,25 @@ function fmt(n, key) {
   return /Touchdowns/.test(key) ? n.toFixed(2) : n.toFixed(1);
 }
 
+// Main line plus FanDuel's "X+" rungs for each prop, with how often he cleared each one.
+function altTable({ rows, lines, stats, opp, home }) {
+  const blocks = stats.filter((st) => lines?.[st.key] && ALT_STEPS[st.key]).map((st) => {
+    const l = lines[st.key];
+    const ladder = altLadder({ rows, statKey: st.key, l, opp, home })
+      .filter((r) => r.thr <= l.line + 1.5 * Math.max(3, l.line * 0.3) && r.thr >= l.line * 0.35);
+    if (!ladder.length) return "";
+    const main = hits(rows, st.key, "over", l.line);
+    const cell = (h, n) => (n ? `${h}/${n}` : "–");
+    return `<tr class="alt-head"><td colspan="5"><b>${st.label}</b> · main line O ${l.line} ${l.over || ""} · L5 ${main.l5}/${main.l5n} · season ${main.all}/${main.n}</td></tr>
+      ${ladder.map((r) => `<tr class="${r.l5n && r.l5 === r.l5n ? "alt-hot" : ""}"><td>${r.thr}+</td><td>${cell(r.l5, r.l5n)}</td><td>${cell(r.all, r.n)}</td><td>${cell(r.vs, r.vsn)}</td><td>${r.source === "estimated" ? "~" : ""}${r.odds || "–"}</td></tr>`).join("")}`;
+  }).join("");
+  return blocks ? `<h3 class="pick-title">Alternate lines</h3>
+    <div class="table-wrap"><table class="log alt-table">
+      <thead><tr><th>Line</th><th>L5</th><th>Season</th><th>Vs opp</th><th>Price</th></tr></thead>
+      <tbody>${blocks}</tbody></table></div>
+    <p class="note">How often he reached each "X+" line. Green = all of his last 5. ~ = estimated price; check FanDuel.</p>` : "";
+}
+
 async function openPlayer(playerId) {
   const g = sheet.game;
   const team = g[sheet.side];
@@ -293,7 +312,8 @@ async function openPlayer(playerId) {
         </table>
       </div>
       <p class="note">Estimate = 60% last 5 + 40% season, scaled for this opponent. ${linesNote}</p>
-      ${propPicker({ player: p.name, playerId, team: team.abbr, opp: opp.abbr, game: g, stats, lines, estimate, rows })}`;
+      ${propPicker({ player: p.name, playerId, team: team.abbr, opp: opp.abbr, game: g, stats, lines, estimate, rows })}
+      ${altTable({ rows, lines, stats, opp: opp.abbr, home: sheet.side === "home" })}`;
     // Matchup for each key stat: e.g. points, rebounds, assists and 3s allowed to this position.
     const checks = sportOf(state.league) === "football"
       ? [["receivingYards", "Yards"], ["tds", "TDs"]]
