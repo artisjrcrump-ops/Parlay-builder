@@ -143,6 +143,8 @@ function bookLink(legs, book) {
       ids.map(([m, x], i) => `marketId[${i}]=${m}&selectionId[${i}]=${x}`).join("&"),
       ids.map(([m, x]) => `marketId=${m}&selectionId=${x}`).join("&"),
     ].map((q) => base + q);
+    // FanDuel's New York site, in case the feed's links are tied to another state's site.
+    variants.push(variants[1].replace("https://sportsbook.", "https://ny.sportsbook."));
     return { url: variants[0], alts: variants.slice(1), n: links.length };
   }
   const first = new URL(links[0]);
@@ -158,7 +160,7 @@ function placeButtons(legs) {
   if (!fd && !dk && !dkGame) return `<div class="settings-actions place-row"><button class="btn" data-copy-picks>📋 Copy picks</button></div><p class="note">No FanDuel/DraftKings bet-slip links for these legs yet (alternate and estimated lines usually don't have one). Reload the picks after props post, or add them in the app by hand.</p>`;
   const btn = (b, name) => b ? `<a class="btn ${name === "FanDuel" ? "primary" : ""} place-btn" href="${b.url}" target="_blank" rel="noopener">Place it on ${name}${b.n < legs.length ? ` (${b.n} of ${legs.length})` : ""} ↗</a>` : "";
   const missing = legs.filter((l) => !l.links?.fd).map((l) => l.player);
-  const tries = fd && fd.n > 1 ? `<p class="note">Not all legs added? Try link <a href="${fd.alts[0]}" target="_blank" rel="noopener">B</a> or <a href="${fd.alts[1]}" target="_blank" rel="noopener">C</a> (clear FanDuel's bet slip first) and tell me which one works.</p>` : "";
+  const tries = fd ? `<p class="note">Not all legs added? Try link <a href="${fd.alts[0]}" target="_blank" rel="noopener">B</a>, <a href="${fd.alts[1]}" target="_blank" rel="noopener">C</a> or <a href="${fd.alts[2]}" target="_blank" rel="noopener">NY</a> (clear FanDuel's bet slip first) and tell me which one works.</p>` : "";
   const copy = `<button class="btn" data-copy-picks>📋 Copy picks</button>`;
   return `<div class="settings-actions place-row">${copy}</div><div class="settings-actions place-row">${btn(fd, "FanDuel")}${dk ? btn(dk, "DraftKings") : dkGame ? `<a class="btn place-btn" href="${dkGame}" target="_blank" rel="noopener">Open on DraftKings ↗</a>` : ""}</div>${tries}
     ${!dk && dkGame ? `<p class="note">DraftKings didn't share bet-slip links for these exact lines (its lines often differ from FanDuel's), so that button opens the game on DraftKings to add picks there.</p>` : ""}
