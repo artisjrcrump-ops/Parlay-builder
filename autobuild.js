@@ -6,13 +6,16 @@
 
 const MAX_LEGS = 10;
 const MAX_PER_GAME = 2;
+// Artis wants overs: an under only makes the cut when it's clearly stronger, and ranks lower.
+const UNDER_BAR = { prob: 0.65, value: 0.06, rank: 0.08 };
+const rank = (c) => c.prob + c.value - (c.side === "under" ? UNDER_BAR.rank : 0);
 const ODDS_RANGE = [1.33, 3.2]; // roughly -300 to +220: skip near-locks and long shots
 
 const THEMES = [
   { name: "Weak defense overs", why: "Overs against bottom-third defenses", fit: (c) => c.side === "over" && c.oppDefPct >= 2 / 3 },
   { name: "Hot hands", why: "Players who cleared this line in 4 or 5 of their last 5", fit: (c) => c.l5Rate >= 0.8 },
   { name: "Shootout games", why: "Overs in the highest-total games on the slate", fit: (c) => c.side === "over" && c.totalPct >= 0.5 },
-  { name: "Lockdown unders", why: "Unders against top-third defenses", fit: (c) => c.side === "under" && c.oppDefPct <= 1 / 3 },
+  { name: "Soft matchup overs", why: "Overs where the opponent gives up the most to this position", fit: (c) => c.side === "over" && c.matchup === "soft matchup" },
   { name: "Best value", why: "Biggest gap between the app's estimate and FanDuel's line", fit: () => true, sort: (a, b) => b.edgeAbs - a.edgeAbs },
 ];
 
@@ -127,6 +130,7 @@ async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
       if (mu?.soft && side === "under") prob -= 0.03;
       const value = prob - 1 / dec;
       if (prob < 0.55 || value <= 0 || edge <= 0) continue;
+      if (side === "under" && (prob < UNDER_BAR.prob || value < UNDER_BAR.value)) continue;
       const label = PROP_LABEL[key] || key;
       out.push({
         id: `${g.id}|${p.name}|${label}|${side}`,
@@ -162,7 +166,7 @@ async function buildCandidates(progress) {
     progress(`Checking players… ${++done}/${jobs.length}`);
     return legs;
   });
-  return results.flat().filter(Boolean).sort((a, b) => b.prob + b.value - (a.prob + a.value));
+  return results.flat().filter(Boolean).sort((a, b) => rank(b) - rank(a));
 }
 
 function buildParlays(cands) {

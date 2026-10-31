@@ -111,7 +111,9 @@ function smartPick({ rows, statKey, est, l, mu, injury, yourWay = false, bank = 
       prob = Math.min(prob, 0.9); // nothing in sports is a lock; stay humble
       const edge = prob - 1 / dec;
       if (bank ? prob < 0.7 || edge < 0 : prob < SMART.minProb || edge < SMART.minEdge) continue;
-      const score = bank ? prob + edge : prob * dec;
+      // Overs first: an under needs a clearly bigger edge and scores lower.
+      if (side === "under" && (prob < 0.7 || edge < 0.08)) continue;
+      const score = (bank ? prob + edge : prob * dec) * (side === "under" ? 0.9 : 1);
       // Same value (within 1%) -> take the likelier line.
       if (!best || score > best.score * 1.01 || (score > best.score * 0.99 && prob > best.prob)) {
         const h = hits(rows, statKey, side, line);

@@ -6,7 +6,7 @@
 const HOT_COUNT = 10;
 
 function hottestPicks(cands) {
-  const heat = (c) => c.l5Rate * 0.5 + c.prob + c.value;
+  const heat = (c) => c.l5Rate * 0.5 + rank(c);
   const seen = new Set();
   return [...cands]
     .sort((a, b) => heat(b) - heat(a))

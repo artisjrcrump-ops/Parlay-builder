@@ -27,7 +27,7 @@ function sgpThemes(g) {
     );
   }
   themes.push(
-    { name: "Grind it out", why: "Unders: a slow, low-scoring game", fit: (c) => c.side === "under" },
+    { name: "Stars go over", why: "Overs for the players the app expects the most from", fit: (c) => c.side === "over", sort: (a, b) => b.est - a.est },
     { name: "Best value", why: "Biggest gaps between the app's estimate and FanDuel's line", fit: () => true, sort: (a, b) => b.edgeAbs - a.edgeAbs },
   );
   return themes;
@@ -83,7 +83,7 @@ async function sgpCandidates(g, progress) {
     progress(`Checking ${g.away.abbr} @ ${g.home.abbr} players… ${++done}/${players.length}`);
     return legs.map((l) => ({ ...l, teamSide: p.side }));
   });
-  return results.flat().filter(Boolean).sort((a, b) => b.prob + b.value - (a.prob + a.value));
+  return results.flat().filter(Boolean).sort((a, b) => rank(b) - rank(a));
 }
 
 async function runSgp(gameId) {
