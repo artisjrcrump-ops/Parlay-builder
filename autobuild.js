@@ -8,6 +8,8 @@ const MAX_LEGS = 10;
 const MAX_PER_GAME = 2;
 // Artis wants overs: an under only makes the cut when it's clearly stronger, and ranks lower.
 const UNDER_BAR = { prob: 0.65, value: 0.06, rank: 0.08 };
+// At most one under in any parlay.
+const underOk = (p, c) => c.side !== "under" || !p.legs.some((l) => l.side === "under");
 const rank = (c) => c.prob + c.value - (c.side === "under" ? UNDER_BAR.rank : 0);
 const ODDS_RANGE = [1.33, 3.2]; // roughly -300 to +220: skip near-locks and long shots
 
@@ -175,7 +177,7 @@ function buildParlays(cands) {
   const decOf = (p) => p.legs.reduce((d, l) => d * l.dec, 1);
   const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * decOf(p) >= TARGET.goal;
 
-  const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`)
+  const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`) && underOk(p, c)
     && !p.legs.some((l) => l.player === c.player)
     && p.legs.filter((l) => l.gameId === c.gameId).length < MAX_PER_GAME;
 
@@ -258,7 +260,7 @@ function buildStatParlays(cands, statKey, label) {
   const parlays = [1, 2, 3, 4, 5].map((n) => ({ name: `${label} #${n}`, why: "", legs: [] }));
   const used = new Set();
   const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.goal;
-  const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`)
+  const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`) && underOk(p, c)
     && !p.legs.some((l) => l.player === c.player)
     && p.legs.filter((l) => l.gameId === c.gameId).length < MAX_PER_GAME;
   let round = 0;

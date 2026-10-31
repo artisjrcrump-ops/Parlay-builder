@@ -56,6 +56,7 @@ function bankPairs(cands, multiple) {
       const a = legs[i];
       const b = legs[j];
       if (a.gameId === b.gameId || a.player === b.player) continue;
+      if (a.side === "under" && b.side === "under") continue; // overs first: one under at most
       const dec = a.dec * b.dec;
       pairs.push({ legs: [a, b], dec, prob: a.prob * b.prob, fits: dec >= multiple * 0.97 && dec <= multiple * 1.3 });
     }

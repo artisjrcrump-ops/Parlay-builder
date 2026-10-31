@@ -38,7 +38,7 @@ function buildSgps(g, cands) {
   const parlays = sgpThemes(g).map((t) => ({ ...t, legs: [] }));
   const full = (p) => p.legs.length >= SGP_MAX_LEGS
     || (p.legs.length >= 3 && slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.low);
-  const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`) && !p.legs.some((l) => l.player === c.player);
+  const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`) && !p.legs.some((l) => l.player === c.player) && underOk(p, c);
 
   let progress = true;
   while (progress) {

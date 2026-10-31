@@ -8,9 +8,10 @@ const HOT_COUNT = 10;
 function hottestPicks(cands) {
   const heat = (c) => c.l5Rate * 0.5 + rank(c);
   const seen = new Set();
+  let unders = 0;
   return [...cands]
     .sort((a, b) => heat(b) - heat(a))
-    .filter((c) => !seen.has(c.player) && seen.add(c.player))
+    .filter((c) => !seen.has(c.player) && (c.side !== "under" || unders++ < 2) && seen.add(c.player)) // overs first: 2 unders max
     .slice(0, HOT_COUNT);
 }
 
