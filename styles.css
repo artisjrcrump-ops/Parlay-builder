@@ -533,3 +533,9 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .sig b { color: var(--text); }
 .alt-table .alt-head td { text-align: left; background: var(--bg); font-size: 12px; }
 .alt-table .alt-hot td { color: #22c55e; font-weight: 600; }
+
+/* Cheatsheets */
+.cheat-row { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 2px; background: none; border: 0; border-top: 1px solid var(--line); color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.cheat-row:first-of-type { border-top: 0; }
+.cheat-hit { font-weight: 700; white-space: nowrap; }
+.cheat-row.added .cheat-hit { color: #22c55e; }

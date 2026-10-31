@@ -131,6 +131,7 @@ async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
     const statKey = l.statKey || key;
     const mu = await matchupFor(opp.id, p.pos, key).catch(() => null);
     const est = (0.6 * avg(last5, statKey) + 0.4 * avg(rows, statKey)) * factor;
+    if (!l.yes) cheatNote({ g, p, team, opp, key, statKey, l, rows, label: PROP_LABEL[key] || key, tough: !!mu?.tough });
     // The app's own best line for this prop (YourWay / alternate), from smartlines.js.
     const smart = l.yes ? null : smartPick({ rows, statKey, est, l, mu, injury: p.injury, yourWay });
     if (smart) {
