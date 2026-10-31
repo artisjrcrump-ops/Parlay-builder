@@ -140,7 +140,7 @@ function placeButtons(legs) {
       <a class="btn place-btn" href="https://sportsbook.fanduel.com/" target="_blank" rel="noopener">Open FanDuel ↗</a>
       <a class="btn place-btn" href="${dkGame || "https://sportsbook.draftkings.com/"}" target="_blank" rel="noopener">Open DraftKings ↗</a>
     </div>
-    <p class="note">Copy your picks, open the book, and search each player to add them.</p>`;
+    <p class="note">FanDuel can't take a pasted list. Tap a player's name above to copy it, then in FanDuel tap 🔍 Search, paste, and pick the line. Go back and forth for each leg.</p>`;
 }
 
 function renderSlip() {
@@ -151,7 +151,7 @@ function renderSlip() {
     <div class="leg ${l.on ? "" : "off"}">
       <button class="leg-toggle" data-toggle-leg="${l.id}" aria-label="Include leg">${l.on ? "✓" : ""}</button>
       <div class="leg-main">
-        <div><b>${l.player}</b> ${legText(l)}</div>
+        <div><button class="copy-name" data-copy-name="${l.player}">${l.player} ⧉</button> ${legText(l)}</div>
         <small>${l.team} vs ${l.opp} · ${l.est != null ? `est ${l.est} · ` : ""}L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
       </div>
       <span class="leg-odds">${l.odds}</span>
@@ -188,6 +188,13 @@ $("sheet-body").addEventListener("click", (e) => {
   if (!t) return;
   const d = t.dataset;
   if (d.addLeg) return toggleCandidate(d.addLeg, t);
+  if (d.copyName) {
+    navigator.clipboard?.writeText(d.copyName).then(() => {
+      t.textContent = `${d.copyName} ✓ copied`;
+      setTimeout(() => { t.textContent = `${d.copyName} ⧉`; }, 1500);
+    });
+    return;
+  }
   if ("copyPicks" in d) {
     const text = slipMath(slip.legs).on.map((l) => `${l.player} ${legText(l)} (${l.odds})`).join("\n");
     navigator.clipboard?.writeText(text).then(() => { t.textContent = "Copied ✓"; }, () => { t.textContent = "Couldn't copy"; });
