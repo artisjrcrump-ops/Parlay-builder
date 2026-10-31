@@ -135,9 +135,25 @@ async function liveLeague(key, progress) {
   }
 }
 
+// Near halftime: "Halftime" on the scoreboard, or the middle of the game by the clock.
+const atHalf = (x) => /half/i.test(x.status) || (x.left >= 0.4 && x.left <= 0.6);
+
+// One game's 2nd-half SGP: its best 2-4 on-pace overs, one per player.
+function liveSgp(x) {
+  const seen = new Set();
+  return x.picks.filter((c) => !seen.has(c.player) && seen.add(c.player)).slice(0, 4);
+}
+
+// Games in the halftime window together can share a parlay: up to 2 picks from each.
+function halftimeParlay(games) {
+  const legs = [];
+  for (const x of games.filter(atHalf)) legs.push(...liveSgp(x).slice(0, 2));
+  return legs;
+}
+
 function renderLive(games, failed = []) {
   sheet.livePicks = games.flatMap((x) => x.picks);
-  const top = [...sheet.livePicks].sort((a, b) => b.prob - a.prob).slice(0, 10);
+  sheet.liveSets = {};
   const inSlip = (c) => slip.legs.some((x) => x.id === c.id);
   const pickRow = (c) => `
     <div class="auto-leg">
@@ -145,21 +161,34 @@ function renderLive(games, failed = []) {
       <small>has ${c.cur} now · on pace for ${c.proj} · ~${Math.round(c.prob * 100)}% to clear${c.role === "bench" ? " · backup in a blowout" : ""}</small></div>
       <button class="pick hot-pick ${inSlip(c) ? "added" : ""}" data-live-add="${c.id}">${c.odds}<br><small>${inSlip(c) ? "Added" : "Add"}</small></button>
     </div>`;
+  const setBtn = (key, legs, label) => {
+    sheet.liveSets[key] = legs;
+    return `<button class="btn primary" data-live-set="${key}">${label} (${legs.length} legs)</button>`;
+  };
+  const multi = halftimeParlay(games);
+  const halfGames = games.filter(atHalf);
   $("sheet-body").innerHTML = `${sportChips()}
     ${failed.length ? `<p class="note">Couldn't load ${failed.join(", ")} right now.</p>` : ""}
     ${games.length ? `
-      <p class="note">Projections use what each player has now plus his usual rate for the time left. When a game turns into a blowout, starters' minutes are cut and backups' go up. The odds shown are the latest in the free feed, which can lag; FanDuel's live 2nd-half lines will be different, so check them before you bet.</p>
-      <h3 class="pick-title">Best 2nd-half overs</h3>
-      ${top.length ? `<div class="auto">${top.map(pickRow).join("")}</div>
-        <div class="settings-actions"><button class="btn" data-open-slip>Open slip</button></div>`
-        : `<p class="status">No overs look likely to clear right now. Refresh in a few minutes.</p>`}
-      <h3 class="pick-title">Live games</h3>
-      ${games.map((x) => `
+      <p class="note">A 2nd-half parlay is a same-game parlay unless more than one game hits halftime at the same time, then legs from those games can go together. Projections use what each player has now plus his usual rate for the time left; in a blowout, starters' minutes are cut and backups' go up. Odds shown can lag, so check FanDuel's live lines before you bet.</p>
+      ${halfGames.length >= 2 && multi.length >= 2 ? `
         <div class="auto">
-          <div class="auto-head"><b>${x.g.away.abbr} ${x.g.away.score} @ ${x.g.home.abbr} ${x.g.home.score}</b><span class="muted">${x.status}</span></div>
-          <small class="auto-why">${x.blowout ? `💥 Blowout developing (${x.margin} pts). Starters may sit, so look at backups.` : x.margin <= 5 ? "Close game. Starters should play heavy minutes." : `Margin ${x.margin}.`} ${x.picks.length} over${x.picks.length === 1 ? "" : "s"} on pace.</small>
-          ${x.picks.slice(0, 4).map(pickRow).join("")}
-        </div>`).join("")}`
+          <div class="auto-head"><b>🕐 Halftime parlay · ${halfGames.length} games at the half</b></div>
+          <small class="auto-why">${halfGames.map((x) => `${x.g.away.abbr} @ ${x.g.home.abbr}`).join(", ")}</small>
+          ${multi.map(pickRow).join("")}
+          ${setBtn("multi", multi, "Add halftime parlay")}
+        </div>` : `<p class="note">${halfGames.length === 1 ? "Only 1 game is at halftime right now, so its 2nd-half parlay is a same-game parlay." : "No games are at halftime right now."} When 2 or more hit the half together, a combined parlay shows here.</p>`}
+      <h3 class="pick-title">2nd-half same-game parlays</h3>
+      ${games.map((x, i) => {
+        const sgp = liveSgp(x);
+        return `
+        <div class="auto">
+          <div class="auto-head"><b>${x.g.away.abbr} ${x.g.away.score} @ ${x.g.home.abbr} ${x.g.home.score}</b><span class="muted">${atHalf(x) ? "🕐 " : ""}${x.status}</span></div>
+          <small class="auto-why">${x.blowout ? `💥 Blowout developing (${x.margin} pts). Starters may sit, so backups are favored.` : x.margin <= 5 ? "Close game. Starters should play heavy minutes." : `Margin ${x.margin}.`}</small>
+          ${sgp.length ? sgp.map(pickRow).join("") + (sgp.length >= 2 ? setBtn(`g${i}`, sgp, "Add as SGP") : "") : `<small class="muted">No overs on pace right now.</small>`}
+        </div>`;
+      }).join("")}
+      <div class="settings-actions"><button class="btn" data-open-slip>Open slip</button></div>`
     : `<p class="status">No games in progress right now in the sports you picked.</p>`}`;
 }
 
@@ -195,17 +224,29 @@ $("live").addEventListener("click", openLive);
 setInterval(updateLiveButton, 3000);
 updateLiveButton();
 
+function addLiveLeg(c, group) {
+  if (slip.legs.some((x) => x.id === c.id)) return;
+  const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season } = c;
+  slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes: false, group, on: true });
+}
+
 $("sheet-body").addEventListener("click", (e) => {
+  const set = e.target.closest("[data-live-set]");
+  if (set && sheet.liveSets) {
+    const legs = sheet.liveSets[set.dataset.liveSet] || [];
+    legs.forEach((c) => addLiveLeg(c, set.dataset.liveSet === "multi" ? "Halftime parlay" : "2nd-half SGP"));
+    persist();
+    set.textContent = "Added ✓";
+    set.classList.remove("primary");
+    return;
+  }
   const b = e.target.closest("[data-live-add]");
   if (!b || !sheet.livePicks) return;
   const c = sheet.livePicks.find((x) => x.id === b.dataset.liveAdd);
   if (!c) return;
   const i = slip.legs.findIndex((x) => x.id === c.id);
   if (i >= 0) slip.legs.splice(i, 1);
-  else {
-    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season } = c;
-    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes: false, group: "2nd half", on: true });
-  }
+  else addLiveLeg(c, "2nd half");
   persist();
   const added = i < 0;
   b.classList.toggle("added", added);
