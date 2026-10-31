@@ -2,7 +2,7 @@
 //   ⚡ 100% recent form   - FanDuel's main line, cleared in each of the last 5 (or more) games
 //   🛡 100% vs opponent   - main line, cleared in every game against tonight's opponent (2+ games)
 //   🪜 100% alternate lines - the highest "X+" rung cleared in every game this season (5+ games)
-//   🪜 90% alternate lines  - a higher rung, cleared in 90%+ of games (8+ games)
+//   🪜 90% alternate lines  - a higher rung, cleared in 90%+ of the last 20 games (this season + last)
 // Filled while props are scored (scorePlayer calls cheatNote), for every sport turned on.
 // Shares globals from the other scripts (state, sheet, slip, $, decimal, american, hits,
 // rungHits, altLadder, sportsCandidates, sportChips, openSheet, persist, loadPref).
@@ -34,7 +34,7 @@ function cheatNote({ g, p, team, opp, key, statKey, l, rows, season, label, toug
   } : null;
   // Versus opponent also looks back two seasons (filled in fillVsOpponent before showing).
   const pend = h.n && h.all / h.n >= 0.6
-    ? { playerId: p.id, league: state.league, statKey, line: l.line, opp: opp.abbr, cur: vs, season } : null;
+    ? { playerId: p.id, league: state.league, statKey, line: l.line, opp: opp.abbr, cur: vs, season, rows, l, home: p.side === "home", base, label, gid: g.id, pname: p.name } : null;
   CHEAT[main.id] = {
     pend, main: { ...main, rate: h.all / h.n },
     form: h.l5n >= 5 && h.l5 === h.l5n ? { ...main, hit: h.l5, of: h.l5n, rate: h.all / h.n } : null,
@@ -69,6 +69,19 @@ async function fillVsOpponent(progress) {
     const games = [...pd.cur, ...old.filter((r) => r.opp === pd.opp && !seen.has(r.eventId))];
     const hit = games.filter((r) => (r.stats[pd.statKey] || 0) > pd.line).length;
     c.vs = games.length >= 2 && hit === games.length ? { ...c.main, hit, of: games.length } : null;
+    // 90% alt lines over the last 20 games (this season plus last), like "18 of last 20".
+    const ids = new Set(pd.rows.map((r) => r.eventId));
+    const last20 = [...pd.rows, ...old.filter((r) => !ids.has(r.eventId)).sort((a, b) => b.date - a.date)].slice(0, 20);
+    const top = c.alt?.thr || 0;
+    const r90 = altLadder({ rows: last20, statKey: pd.statKey, l: pd.l, opp: pd.opp, home: pd.home })
+      .filter((x) => x.n >= 10 && x.all < x.n && x.all / x.n >= 0.9 && x.thr > top && x.dec && x.dec >= 1.15 && x.dec <= 2.2).pop();
+    if (r90) {
+      c.alt90 = {
+        ...pd.base, id: `${pd.gid}|${pd.pname}|${pd.label}|over|alt${r90.thr}`, line: r90.line, thr: r90.thr,
+        odds: r90.odds, est: r90.source === "estimated", l5: `${r90.l5}/${r90.l5n}`, season: `${r90.all}/${r90.n}`,
+        hit: r90.all, of: r90.n, dec: r90.dec,
+      };
+    }
   }
 }
 
