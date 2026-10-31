@@ -163,6 +163,10 @@ function placeButtons(legs) {
     ${!dk && dkGame ? `<p class="note">DraftKings didn't share bet-slip links for these exact lines (its lines often differ from FanDuel's), so that button opens the game on DraftKings to add picks there.</p>` : ""}
     ${!dk && !dkGame ? `<p class="note">No DraftKings links came with these picks.</p>` : ""}
     ${missing.length && fd ? `<p class="note">Add by hand in FanDuel: ${missing.join(", ")}.</p>` : ""}
+    <details class="note"><summary>Link details (for fixing links)</summary>${legs.map((l) => {
+      const q = l.links?.fd ? new URL(l.links.fd).searchParams : null;
+      return `<div><b>${l.player}</b> ${legText(l)}: ${q ? `market ${q.get("marketId")} · selection ${q.get("selectionId")}` : "no FanDuel link"}<br><small>matched ${l.links?.src || "–"} (${l.links?.n ?? 0} found)</small></div>`;
+    }).join("")}</details>
     <p class="note">If FanDuel says a selection wasn't added, one leg has closed or moved. Use FD↗ on each leg to add them one at a time.</p>`;
 }
 

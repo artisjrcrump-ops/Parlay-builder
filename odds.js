@@ -70,21 +70,21 @@ const linkKey = (gameId, player, side, line) => `${gameId}|${norm(player)}|${sid
 
 function noteLinks(game, player, stat, side, o) {
   if (!o) return;
-  const add = (line, fd, dk) => {
+  const add = (line, fd, dk, odds, kind) => {
     if (!fd && !dk) return;
     const k = linkKey(game.id, player, side, line);
-    (BET_LINKS[k] ||= []).push({ stat, fd, dk });
+    (BET_LINKS[k] ||= []).push({ stat, fd, dk, src: `${stat} ${side} ${line} ${odds ?? ""} ${kind}` });
   };
   const main = parseFloat(o.overUnder);
-  add(Number.isFinite(main) ? main : 0.5, o.link, o.dk?.[main]);
-  for (const a of o.altLines || []) add(parseFloat(a.overUnder), a.link, o.dk?.[parseFloat(a.overUnder)]);
+  add(Number.isFinite(main) ? main : 0.5, o.link, o.dk?.[main], o.odds, "main");
+  for (const a of o.altLines || []) add(parseFloat(a.overUnder), a.link, o.dk?.[parseFloat(a.overUnder)], a.odds, "alt");
 }
 
 function betLinksFor(leg) {
   const list = BET_LINKS[linkKey(leg.gameId, leg.player, leg.side === "under" ? "under" : "over", leg.line)] || [];
   const hit = list.find((x) => x.stat === leg.gradeKey) || (list.length === 1 ? list[0] : null);
   const dkGame = GAME_DK[leg.gameId] || null;
-  return hit || dkGame ? { fd: hit?.fd || null, dk: hit?.dk || null, dkGame } : null;
+  return hit || dkGame ? { fd: hit?.fd || null, dk: hit?.dk || null, dkGame, src: hit?.src || "", n: list.length } : null;
 }
 
 // One request per league per day, cached, to stay inside the free monthly allowance.
