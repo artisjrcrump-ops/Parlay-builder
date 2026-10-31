@@ -94,7 +94,7 @@ function smartPick({ rows, statKey, est, l, mu, injury }) {
       let prob = sideProb(rows, statKey, est, sd, line, side) - (injury ? 0.05 : 0);
       if (mu?.tough && side === "under") prob += 0.02;
       if (mu?.soft && side === "over") prob += 0.02;
-      prob = Math.min(prob, 0.95);
+      prob = Math.min(prob, 0.9); // nothing in sports is a lock; stay humble
       const edge = prob - 1 / dec;
       if (prob < SMART.minProb || edge < SMART.minEdge) continue;
       const score = prob * dec;
@@ -160,7 +160,7 @@ function renderSmartSummary() {
   if (!box) return;
   box.innerHTML = `
     <div><b>${m.legs.length} legs</b> · ${american(m.dec)} · ${money(slip.stake)} pays <b>${money(m.pay)}</b></div>
-    <div class="muted">Whole ticket hits about <b>${m.legs.length ? `${(m.hit * 100).toFixed(m.hit < 0.1 ? 1 : 0)}%` : "–"}</b> of the time${oneIn && m.legs.length ? ` (about 1 in ${oneIn} tickets)` : ""}</div>
+    <div class="muted">Whole ticket hits about <b>${m.legs.length ? `${(m.hit * 100).toFixed(m.hit < 0.1 ? 1 : 0)}%` : "–"}</b> of the time${oneIn >= 2 && m.legs.length ? ` (about 1 in ${oneIn} tickets)` : ""}</div>
     ${m.estimated ? `<div class="warn small">Some prices are estimates. Set the line in FanDuel YourWay and type in the real odds after you save the slip.</div>` : ""}
     ${m.sameGame ? `<div class="warn small">Some legs share a game. FanDuel reprices those, so the real payout will be lower.</div>` : ""}`;
   $("sheet-body").querySelectorAll("[data-smart-leg]").forEach((b) => {
