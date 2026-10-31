@@ -234,7 +234,7 @@ async function load(quiet = false) {
     const live = games.filter((g) => g.state === "in").length;
     const left = games.filter((g) => g.state !== "post").length;
     $("status").textContent = games.length
-      ? `${left} game${left === 1 ? "" : "s"} left${live ? ` · ${live} live` : ""} · updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+      ? `${left ? `${left} game${left === 1 ? "" : "s"} left` : `All ${games.length} final`}${live ? ` · ${live} live` : ""} · updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
       : "No games on this day.";
     // While games are live, refresh every minute so finished ones drop off on their own.
     if (live) liveTimer = setTimeout(() => { if (!document.hidden) load(true); }, 60 * 1000);
