@@ -30,6 +30,14 @@ const PROP_LABEL = {
   rushRec: "Rush+Rec Yds",
 };
 
+// Big favorites: starters may sit late, so bench players get extra minutes on both sides.
+const BLOWOUT_SPREAD = { nba: 10, ncaab: 14, nfl: 10, ncaaf: 17 };
+function spreadSize(g) {
+  const m = (g.odds?.spread || "").match(/-?\d+(\.\d+)?$/);
+  return m ? Math.abs(parseFloat(m[0])) : 0;
+}
+const isBlowout = (g) => spreadSize(g) >= (BLOWOUT_SPREAD[state.league] || 99);
+
 // Leaders and injuries for one game, from ESPN's game summary.
 async function gamePlayers(g) {
   const lg = LEAGUES[state.league];
@@ -50,7 +58,21 @@ async function gamePlayers(g) {
       }
     }
   }
-  return [...players.values()];
+  const out = [...players.values()];
+  out.injuries = injuries;
+  return out;
+}
+
+// Bench players for a projected blowout: everyone on the roster who isn't a game leader.
+async function benchPlayers(g, leaders) {
+  const ids = new Set(leaders.map((p) => p.id));
+  const out = [];
+  for (const side of ["away", "home"]) {
+    const roster = await loadRoster(g[side].id).catch(() => []);
+    roster.filter((p) => !ids.has(p.id)).slice(0, 10)
+      .forEach((p) => out.push({ ...p, side, bench: true, injury: leaders.injuries?.[p.id] }));
+  }
+  return out;
 }
 
 async function pool(items, size, fn) {
@@ -159,6 +181,13 @@ async function buildCandidates(progress) {
   const jobs = [];
   games.forEach((g, i) => (perGame[i] || []).forEach((p) => jobs.push({ g, p })));
 
+  const blowouts = games.filter(isBlowout);
+  if (blowouts.length) {
+    progress(`Finding bench players in ${blowouts.length} possible blowout${blowouts.length === 1 ? "" : "s"}…`);
+    const benches = await pool(blowouts, 3, (g) => benchPlayers(g, perGame[games.indexOf(g)] || []));
+    blowouts.forEach((g, i) => (benches[i] || []).forEach((p) => jobs.push({ g, p })));
+  }
+
   progress("Checking defense vs position for every team…");
   await loadSlateDvp().catch(() => null);
 
@@ -166,6 +195,14 @@ async function buildCandidates(progress) {
   const results = await pool(jobs, 6, async ({ g, p }) => {
     const legs = await scorePlayer(g, p, totalPct(g.odds?.total || 0));
     progress(`Checking players… ${++done}/${jobs.length}`);
+    if (!isBlowout(g)) return legs;
+    for (const l of legs) {
+      l.blowout = true;
+      l.bench = !!p.bench;
+      // Starters' overs in a likely blowout carry minutes risk.
+      if (!p.bench && l.side === "over") { l.prob -= 0.04; l.value -= 0.04; }
+      if (p.bench) l.matchup = [l.matchup, "bench, blowout spot"].filter(Boolean).join(" · ");
+    }
     return legs;
   });
   return results.flat().filter(Boolean).sort((a, b) => rank(b) - rank(a));
@@ -246,19 +283,19 @@ function renderParlays(parlays, opts = {}) {
 
 const AUTO_MODES = {
   basketball: [
-    ["smart", "Best lines pool"], ["mixed", "Mixed: 5 themed parlays"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
+    ["smart", "Best lines pool"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
     ["assists", "Assists"], ["points", "Points"], ["pra", "Pts + Reb + Ast"],
   ],
   football: [
-    ["smart", "Best lines pool"], ["mixed", "Mixed: 5 themed parlays"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
+    ["smart", "Best lines pool"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
     ["rushingYards", "Rushing yards"], ["receivingYards", "Receiving yards"], ["receptions", "Receptions"],
   ],
 };
 
 // 5 parlays from one prop type, best picks spread snake-style so #1 isn't the only good one.
-function buildStatParlays(cands, statKey, label) {
+function buildStatParlays(cands, statKey, label, fit = (c) => c.statKey === statKey) {
   // Overs first: an under only fills a spot when no over is left.
-  const pool = cands.filter((c) => c.statKey === statKey).sort((a, b) => (a.side === "under") - (b.side === "under"));
+  const pool = cands.filter(fit).sort((a, b) => (a.side === "under") - (b.side === "under"));
   const parlays = [1, 2, 3, 4, 5].map((n) => ({ name: `${label} #${n}`, why: "", legs: [] }));
   const used = new Set();
   const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.goal;
@@ -308,12 +345,15 @@ function renderAuto() {
   sheet.smart = null;
   if (mode === "smart") return renderSmart(header, all);
   const cands = postedOnly(all);
-  const parlays = mode === "mixed" ? buildParlays(cands) : buildStatParlays(cands, mode, label);
+  const parlays = mode === "mixed" ? buildParlays(cands)
+    : mode === "blowout" ? buildStatParlays(cands, null, "Blowout bench", (c) => c.bench && (c.side === "over" || c.yes))
+    : buildStatParlays(cands, mode, label);
   renderParlays(parlays, {
     header,
     intro: mode === "mixed" ? undefined
+      : mode === "blowout" ? `Bench players in games with a big spread (NBA 10+, college hoops 14+, NFL 10+, college football 17+), where starters may sit late and backups get extra minutes. Overs only.`
       : `Only ${label.toLowerCase()} props. Each pick is checked against how tonight's opponent defends that stat at the player's position, plus recent form, season hit rate and the estimate vs FanDuel's line. No pick appears in more than one parlay.`,
-    empty: `Not enough strong ${mode === "mixed" ? "" : `${label.toLowerCase()} `}picks on this slate. Try another prop type, day or sport.`,
+    empty: mode === "blowout" ? "No bench players with FanDuel props in a projected blowout on this slate." : `Not enough strong ${mode === "mixed" ? "" : `${label.toLowerCase()} `}picks on this slate. Try another prop type, day or sport.`,
   });
 }
 
