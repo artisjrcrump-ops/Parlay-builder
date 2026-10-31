@@ -125,6 +125,7 @@ function openSlip() {
   sheet.game = null;
   $("sheet-back").hidden = true;
   $("sheet-title").textContent = "Your slip";
+  persist(); // picks up bet-slip links loaded since these legs were added
   renderSlip();
   openSheet();
 }
