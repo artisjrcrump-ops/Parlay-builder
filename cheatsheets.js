@@ -2,6 +2,7 @@
 //   ⚡ 100% recent form   - FanDuel's main line, cleared in each of the last 5 (or more) games
 //   🛡 100% vs opponent   - main line, cleared in every game against tonight's opponent (2+ games)
 //   🪜 100% alternate lines - the highest "X+" rung cleared in every game this season (5+ games)
+//   🪜 90% alternate lines  - a higher rung, cleared in 90%+ of games (8+ games)
 // Filled while props are scored (scorePlayer calls cheatNote), for every sport turned on.
 // Shares globals from the other scripts (state, sheet, slip, $, decimal, american, hits,
 // rungHits, altLadder, sportsCandidates, sportChips, openSheet, persist, loadPref).
@@ -21,8 +22,16 @@ function cheatNote({ g, p, team, opp, key, statKey, l, rows, season, label, toug
   const vsHit = vs.filter((r) => (r.stats[statKey] || 0) > l.line).length;
   const main = { ...base, id: `${g.id}|${p.name}|${label}|over`, line: l.line, odds: l.over, l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}` };
   // Highest rung cleared every game, still worth a leg (about -1000 to -105).
-  const rung = altLadder({ rows, statKey, l, opp: opp.abbr, home: p.side === "home" })
-    .filter((s) => s.n >= 5 && s.all === s.n && s.dec && s.dec >= 1.1 && s.dec <= 1.95).pop();
+  const ladder = altLadder({ rows, statKey, l, opp: opp.abbr, home: p.side === "home" });
+  const rung = ladder.filter((s) => s.n >= 5 && s.all === s.n && s.dec && s.dec >= 1.1 && s.dec <= 1.95).pop();
+  // 90%: a higher rung than the 100% one, cleared in 90%+ of games (8+ games, so 1 miss at most per 10).
+  const rung90 = ladder.filter((s) => s.n >= 8 && s.all < s.n && s.all / s.n >= 0.9 && (!rung || s.thr > rung.thr)
+    && s.dec && s.dec >= 1.15 && s.dec <= 2.2).pop();
+  const altEntry = (r) => r ? {
+    ...base, id: `${g.id}|${p.name}|${label}|over|alt${r.thr}`, line: r.line, thr: r.thr,
+    odds: r.odds, est: r.source === "estimated", l5: `${r.l5}/${r.l5n}`, season: `${r.all}/${r.n}`,
+    hit: r.all, of: r.n, dec: r.dec,
+  } : null;
   // Versus opponent also looks back two seasons (filled in fillVsOpponent before showing).
   const pend = h.n && h.all / h.n >= 0.6
     ? { playerId: p.id, league: state.league, statKey, line: l.line, opp: opp.abbr, cur: vs, season } : null;
@@ -30,11 +39,8 @@ function cheatNote({ g, p, team, opp, key, statKey, l, rows, season, label, toug
     pend, main: { ...main, rate: h.all / h.n },
     form: h.l5n >= 5 && h.l5 === h.l5n ? { ...main, hit: h.l5, of: h.l5n, rate: h.all / h.n } : null,
     vs: vs.length >= 2 && vsHit === vs.length ? { ...main, hit: vsHit, of: vs.length, rate: h.all / h.n } : null,
-    alt: rung ? {
-      ...base, id: `${g.id}|${p.name}|${label}|over|alt${rung.thr}`, line: rung.line, thr: rung.thr,
-      odds: rung.odds, est: rung.source === "estimated", l5: `${rung.l5}/${rung.l5n}`, season: `${rung.all}/${rung.n}`,
-      hit: rung.all, of: rung.n, dec: rung.dec,
-    } : null,
+    alt: altEntry(rung),
+    alt90: altEntry(rung90),
   };
 }
 
@@ -70,7 +76,7 @@ function cheatLists(cands) {
   const games = new Set(cands.map((c) => c.gameId));
   const now = Date.now();
   const rows = Object.values(CHEAT).filter((c) => {
-    const any = c.form || c.vs || c.alt;
+    const any = c.form || c.vs || c.alt || c.alt90;
     return any && (games.size ? games.has(any.gameId) : true) && new Date(any.date).getTime() > now - 3 * 3600e3;
   });
   const pick = (kind, order) => {
@@ -83,6 +89,7 @@ function cheatLists(cands) {
     { kind: "form", icon: "⚡", title: "100% Recent Form", list: pick("form", bySample) },
     { kind: "vs", icon: "🛡", title: "100% Versus Opponent", list: pick("vs", bySample) },
     { kind: "alt", icon: "🪜", title: "100% Alternate Lines", list: pick("alt", (a, b) => b.of - a.of || b.dec - a.dec || b.thr - a.thr) },
+    { kind: "alt90", icon: "🪜", title: "90% Alternate Lines", list: pick("alt90", (a, b) => b.hit / b.of - a.hit / a.of || b.of - a.of || b.dec - a.dec) },
   ];
 }
 
