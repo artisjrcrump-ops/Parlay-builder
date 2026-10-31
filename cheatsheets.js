@@ -20,9 +20,9 @@ function cheatNote({ g, p, team, opp, key, statKey, l, rows, label, tough }) {
   const vs = rows.filter((r) => r.opp === opp.abbr);
   const vsHit = vs.filter((r) => (r.stats[statKey] || 0) > l.line).length;
   const main = { ...base, id: `${g.id}|${p.name}|${label}|over`, line: l.line, odds: l.over, l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}` };
-  // Highest rung cleared every game, still worth a leg (not shorter than about -1000).
+  // Highest rung cleared every game, still worth a leg (about -1000 to -105).
   const rung = altLadder({ rows, statKey, l, opp: opp.abbr, home: p.side === "home" })
-    .filter((s) => s.n >= 5 && s.all === s.n && s.dec && s.dec >= 1.1).pop();
+    .filter((s) => s.n >= 5 && s.all === s.n && s.dec && s.dec >= 1.1 && s.dec <= 1.95).pop();
   CHEAT[main.id] = {
     form: h.l5n >= 5 && h.l5 === h.l5n ? { ...main, hit: h.l5, of: h.l5n, rate: h.all / h.n } : null,
     vs: vs.length >= 2 && vsHit === vs.length ? { ...main, hit: vsHit, of: vs.length, rate: h.all / h.n } : null,
