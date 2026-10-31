@@ -153,7 +153,8 @@ function placeButtons(legs) {
   const btn = (b, name) => b ? `<a class="btn ${name === "FanDuel" ? "primary" : ""} place-btn" href="${b.url}" target="_blank" rel="noopener">Place it on ${name}${b.n < legs.length ? ` (${b.n} of ${legs.length})` : ""} ↗</a>` : "";
   const missing = legs.filter((l) => !l.links?.fd).map((l) => l.player);
   return `<div class="settings-actions place-row">${btn(fd, "FanDuel")}${btn(dk, "DraftKings")}</div>
-    ${missing.length && fd ? `<p class="note">Add by hand in FanDuel: ${missing.join(", ")}.</p>` : ""}`;
+    ${missing.length && fd ? `<p class="note">Add by hand in FanDuel: ${missing.join(", ")}.</p>` : ""}
+    <p class="note">If FanDuel says a selection wasn't added, one leg has closed or moved. Use FD↗ on each leg to add them one at a time.</p>`;
 }
 
 function renderSlip() {
@@ -168,6 +169,7 @@ function renderSlip() {
         <small>${l.team} vs ${l.opp} · est ${l.est} · L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
       </div>
       <span class="leg-odds">${l.odds}</span>
+      ${l.on && l.links?.fd ? `<a class="leg-fd" href="${l.links.fd}" target="_blank" rel="noopener" aria-label="Open this leg in FanDuel">FD↗</a>` : ""}
       <button class="leg-x" data-remove-leg="${l.id}" aria-label="Remove leg">✕</button>
     </div>`).join("");
 
