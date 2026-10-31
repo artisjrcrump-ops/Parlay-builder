@@ -130,47 +130,17 @@ function openSlip() {
   openSheet();
 }
 
-// One link that opens FanDuel / DraftKings with every linked leg already in the bet slip.
-function bookLink(legs, book) {
-  const links = legs.map((l) => l.links?.[book]).filter(Boolean);
-  if (!links.length) return null;
-  if (book === "fd") {
-    const ids = links.map((u) => new URL(u).searchParams).map((q) => [q.get("marketId"), q.get("selectionId")]);
-    const base = "https://sportsbook.fanduel.com/addToBetslip?";
-    // FanDuel's multi-leg format isn't documented; three ways to join legs, first one is the button.
-    const variants = [
-      ids.map(([m]) => `marketId[]=${m}`).concat(ids.map(([, x]) => `selectionId[]=${x}`)).join("&"),
-      ids.map(([m, x], i) => `marketId[${i}]=${m}&selectionId[${i}]=${x}`).join("&"),
-      ids.map(([m, x]) => `marketId=${m}&selectionId=${x}`).join("&"),
-    ].map((q) => base + q);
-    // FanDuel's New York site, in case the feed's links are tied to another state's site.
-    variants.push(variants[1].replace("https://sportsbook.", "https://ny.sportsbook."));
-    return { url: variants[0], alts: variants.slice(1), n: links.length };
-  }
-  const first = new URL(links[0]);
-  const outcomes = links.map((u) => new URL(u).searchParams.get("outcomes")).filter(Boolean);
-  return { url: `${first.origin}${first.pathname}?outcomes=${outcomes.map(encodeURIComponent).join("+")}`, n: outcomes.length };
-}
-
+// FanDuel/DraftKings bet-slip links from the free feed don't work in New York (they're tied to
+// another state's book), so: copy the picks, then open the book to add them.
 function placeButtons(legs) {
   if (!legs.length) return "";
-  const fd = bookLink(legs, "fd");
-  const dk = bookLink(legs, "dk");
   const dkGame = legs.find((l) => l.links?.dkGame)?.links.dkGame;
-  if (!fd && !dk && !dkGame) return `<div class="settings-actions place-row"><button class="btn" data-copy-picks>📋 Copy picks</button></div><p class="note">No FanDuel/DraftKings bet-slip links for these legs yet (alternate and estimated lines usually don't have one). Reload the picks after props post, or add them in the app by hand.</p>`;
-  const btn = (b, name) => b ? `<a class="btn ${name === "FanDuel" ? "primary" : ""} place-btn" href="${b.url}" target="_blank" rel="noopener">Place it on ${name}${b.n < legs.length ? ` (${b.n} of ${legs.length})` : ""} ↗</a>` : "";
-  const missing = legs.filter((l) => !l.links?.fd).map((l) => l.player);
-  const tries = fd ? `<p class="note">Not all legs added? Try link <a href="${fd.alts[0]}" target="_blank" rel="noopener">B</a>, <a href="${fd.alts[1]}" target="_blank" rel="noopener">C</a> or <a href="${fd.alts[2]}" target="_blank" rel="noopener">NY</a> (clear FanDuel's bet slip first) and tell me which one works.</p>` : "";
-  const copy = `<button class="btn" data-copy-picks>📋 Copy picks</button>`;
-  return `<div class="settings-actions place-row">${copy}</div><div class="settings-actions place-row">${btn(fd, "FanDuel")}${dk ? btn(dk, "DraftKings") : dkGame ? `<a class="btn place-btn" href="${dkGame}" target="_blank" rel="noopener">Open on DraftKings ↗</a>` : ""}</div>${tries}
-    ${!dk && dkGame ? `<p class="note">DraftKings didn't share bet-slip links for these exact lines (its lines often differ from FanDuel's), so that button opens the game on DraftKings to add picks there.</p>` : ""}
-    ${!dk && !dkGame ? `<p class="note">No DraftKings links came with these picks.</p>` : ""}
-    ${missing.length && fd ? `<p class="note">Add by hand in FanDuel: ${missing.join(", ")}.</p>` : ""}
-    <details class="note"><summary>Link details (for fixing links)</summary>${legs.map((l) => {
-      const q = l.links?.fd ? new URL(l.links.fd).searchParams : null;
-      return `<div><b>${l.player}</b> ${legText(l)}: ${q ? `market ${q.get("marketId")} · selection ${q.get("selectionId")}` : "no FanDuel link"}<br><small>matched ${l.links?.src || "–"} (${l.links?.n ?? 0} found)</small></div>`;
-    }).join("")}</details>
-    <p class="note">If FanDuel says a selection wasn't added, one leg has closed or moved. Use FD↗ on each leg to add them one at a time.</p>`;
+  return `<div class="settings-actions place-row">
+      <button class="btn primary" data-copy-picks>📋 Copy picks</button>
+      <a class="btn place-btn" href="https://sportsbook.fanduel.com/" target="_blank" rel="noopener">Open FanDuel ↗</a>
+      <a class="btn place-btn" href="${dkGame || "https://sportsbook.draftkings.com/"}" target="_blank" rel="noopener">Open DraftKings ↗</a>
+    </div>
+    <p class="note">Copy your picks, open the book, and search each player to add them.</p>`;
 }
 
 function renderSlip() {
@@ -185,7 +155,6 @@ function renderSlip() {
         <small>${l.team} vs ${l.opp} · ${l.est != null ? `est ${l.est} · ` : ""}L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
       </div>
       <span class="leg-odds">${l.odds}</span>
-      ${l.on && l.links?.fd ? `<a class="leg-fd" href="${l.links.fd}" target="_blank" rel="noopener" aria-label="Open this leg in FanDuel">FD↗</a>` : ""}
       <button class="leg-x" data-remove-leg="${l.id}" aria-label="Remove leg">✕</button>
     </div>`).join("");
 
