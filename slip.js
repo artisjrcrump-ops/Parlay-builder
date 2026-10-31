@@ -2,7 +2,7 @@
 // and see the payout against the $400–$2,500 target. Saved slips (results.js) live on this device.
 // Shares globals from the other scripts (state, sheet, $, fmt, openSheet, loadPref, savePref).
 
-const TARGET = { low: 400, high: 2500 };
+const TARGET = { low: 800, goal: 1000, high: 1500 }; // Artis aims for about $1,000 back
 const candidates = {}; // leg id -> leg, for the player page currently shown
 
 function loadList(key) {

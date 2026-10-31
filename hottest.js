@@ -51,7 +51,7 @@ async function openHottest() {
   if (!loadPref("sgoKey", "")) return status("Add your SportsGameOdds key in ⚙︎ Settings first. Hottest picks need FanDuel's lines.");
   try {
     const cands = withoutSaved(await slateCandidates(status));
-    renderHottest(hottestPicks(cands), skippedNote(cands));
+    renderHottest(hottestPicks(postedOnly(cands)), skippedNote(cands));
   } catch (err) {
     status(/No upcoming/.test(err.message)
       ? `No upcoming ${LEAGUES[state.league].label} games on this day. Use ‹ › on the main screen to change the day.`

@@ -100,7 +100,7 @@ async function runSgp(gameId) {
   const status = (msg) => { $("sheet-body").innerHTML = `<p class="status">${msg}</p>`; };
   try {
     const cands = withoutSaved(await sgpCandidates(g, status));
-    renderParlays(buildSgps(g, cands), {
+    renderParlays(buildSgps(g, postedOnly(cands)), {
       header: skippedNote(cands),
       intro: "Each same-game parlay follows one game script so its legs help each other. No pick appears in more than one.",
       outro: "FanDuel reprices same-game parlays for correlation, so the real payout will usually be lower than shown. These are model picks, not guarantees.",

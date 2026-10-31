@@ -4,7 +4,7 @@
 // loadGameLog, getPlayerLines, opponentFactor, avg, hits, decimal, american, money,
 // ordinal, openSheet, persist, TARGET).
 
-const MAX_LEGS = 8;
+const MAX_LEGS = 10;
 const MAX_PER_GAME = 2;
 const ODDS_RANGE = [1.33, 3.2]; // roughly -300 to +220: skip near-locks and long shots
 
@@ -15,6 +15,15 @@ const THEMES = [
   { name: "Lockdown unders", why: "Unders against top-third defenses", fit: (c) => c.side === "under" && c.oppDefPct <= 1 / 3 },
   { name: "Best value", why: "Biggest gap between the app's estimate and FanDuel's line", fit: () => true, sort: (a, b) => b.edgeAbs - a.edgeAbs },
 ];
+
+const PROP_LABEL = {
+  points: "PTS", totalRebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA",
+  steals: "STL", blocks: "BLK", pr: "P+R", pa: "P+A", ra: "R+A", doubleDouble: "Double-double",
+  passingYards: "Pass Yds", passingTouchdowns: "Pass TD", rushingYards: "Rush Yds",
+  receptions: "Rec", receivingYards: "Rec Yds", anytimeTd: "Anytime TD", twoTd: "2+ TDs",
+  passingAttempts: "Pass Att", completions: "Completions", interceptions: "INT", longReception: "Long Rec",
+  rushRec: "Rush+Rec Yds",
+};
 
 // Leaders and injuries for one game, from ESPN's game summary.
 async function gamePlayers(g) {
@@ -72,6 +81,18 @@ async function scorePlayer(g, p, totalPct = 0.5) {
     const statKey = l.statKey || key;
     const mu = await matchupFor(opp.id, p.pos, key).catch(() => null);
     const est = (0.6 * avg(last5, statKey) + 0.4 * avg(rows, statKey)) * factor;
+    // The app's own best line for this prop (YourWay / alternate), from smartlines.js.
+    const smart = l.yes ? null : smartPick({ rows, statKey, est, l, mu, injury: p.injury });
+    if (smart) {
+      out.push({
+        id: `${g.id}|${p.name}|${PROP_LABEL[key] || key}|${smart.side}|smart`, smart: true,
+        player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
+        stat: PROP_LABEL[key] || key, statKey: key, gradeKey: statKey, league: state.league, yes: false,
+        ...smart, est: Math.round(est * 10) / 10, postedLine: l.line,
+        oppDef: opp.def, oppN: opp.n, injury: p.injury || "", on: true,
+        matchup: mu && (mu.tough || mu.soft) ? (mu.tough ? "tough matchup" : "soft matchup") : "",
+      });
+    }
     for (const side of ["over", "under"]) {
       const odds = side === "over" ? l.over : l.under;
       const dec = decimal(odds);
@@ -93,12 +114,7 @@ async function scorePlayer(g, p, totalPct = 0.5) {
       if (mu?.soft && side === "under") prob -= 0.03;
       const value = prob - 1 / dec;
       if (prob < 0.55 || value <= 0 || edge <= 0) continue;
-      const label = { points: "PTS", totalRebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA",
-        passingYards: "Pass Yds", passingTouchdowns: "Pass TD", rushingYards: "Rush Yds",
-        receptions: "Rec", receivingYards: "Rec Yds", anytimeTd: "Anytime TD", twoTd: "2+ TDs",
-      steals: "STL", blocks: "BLK", pr: "P+R", pa: "P+A", ra: "R+A", doubleDouble: "Double-double",
-      passingAttempts: "Pass Att", completions: "Completions", interceptions: "INT", longReception: "Long Rec",
-      rushRec: "Rush+Rec Yds" }[key] || key;
+      const label = PROP_LABEL[key] || key;
       out.push({
         id: `${g.id}|${p.name}|${label}|${side}`,
         player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
@@ -140,7 +156,7 @@ function buildParlays(cands) {
   const used = new Set(); // leg ids and player+stat keys already taken by any parlay
   const parlays = THEMES.map((t) => ({ ...t, legs: [] }));
   const decOf = (p) => p.legs.reduce((d, l) => d * l.dec, 1);
-  const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * decOf(p) >= TARGET.low;
+  const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * decOf(p) >= TARGET.goal;
 
   const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`)
     && !p.legs.some((l) => l.player === c.player)
@@ -208,11 +224,11 @@ function renderParlays(parlays, opts = {}) {
 
 const AUTO_MODES = {
   basketball: [
-    ["mixed", "Mixed: 5 themed parlays"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
+    ["smart", "Best lines pool (YourWay)"], ["mixed", "Mixed: 5 themed parlays"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
     ["assists", "Assists"], ["points", "Points"], ["pra", "Pts + Reb + Ast"],
   ],
   football: [
-    ["mixed", "Mixed: 5 themed parlays"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
+    ["smart", "Best lines pool (YourWay)"], ["mixed", "Mixed: 5 themed parlays"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
     ["rushingYards", "Rushing yards"], ["receivingYards", "Receiving yards"], ["receptions", "Receptions"],
   ],
 };
@@ -222,7 +238,7 @@ function buildStatParlays(cands, statKey, label) {
   const pool = cands.filter((c) => c.statKey === statKey);
   const parlays = [1, 2, 3, 4, 5].map((n) => ({ name: `${label} #${n}`, why: "", legs: [] }));
   const used = new Set();
-  const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.low;
+  const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.goal;
   const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`)
     && !p.legs.some((l) => l.player === c.player)
     && p.legs.filter((l) => l.gameId === c.gameId).length < MAX_PER_GAME;
@@ -252,13 +268,17 @@ function buildStatParlays(cands, statKey, label) {
 function renderAuto() {
   const c = sheet.autoCache;
   const modes = AUTO_MODES[sportOf(state.league)];
-  const mode = modes.some(([k]) => k === sheet.autoMode) ? sheet.autoMode : "mixed";
+  const mode = modes.some(([k]) => k === sheet.autoMode) ? sheet.autoMode : "smart";
   const label = modes.find(([k]) => k === mode)[1];
-  const cands = withoutSaved(c.cands);
+  const all = withoutSaved(c.cands);
+  const header = `<label class="mode"><span>Build</span><select id="auto-mode">${modes
+    .map(([k, l]) => `<option value="${k}" ${k === mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>${skippedNote(all)}`;
+  sheet.smart = null;
+  if (mode === "smart") return renderSmart(header, all);
+  const cands = postedOnly(all);
   const parlays = mode === "mixed" ? buildParlays(cands) : buildStatParlays(cands, mode, label);
   renderParlays(parlays, {
-    header: `<label class="mode"><span>Build</span><select id="auto-mode">${modes
-      .map(([k, l]) => `<option value="${k}" ${k === mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>${skippedNote(cands)}`,
+    header,
     intro: mode === "mixed" ? undefined
       : `Only ${label.toLowerCase()} props. Each pick is checked against how tonight's opponent defends that stat at the player's position, plus recent form, season hit rate and the estimate vs FanDuel's line. No pick appears in more than one parlay.`,
     empty: `Not enough strong ${mode === "mixed" ? "" : `${label.toLowerCase()} `}picks on this slate. Try another prop type, day or league.`,
@@ -274,6 +294,9 @@ function withoutSaved(cands) {
   kept.skipped = cands.length ? new Set(cands.filter((c) => taken.has(savedKey(c))).map(savedKey)).size : 0;
   return kept;
 }
+
+// Legs on FanDuel's posted lines only (the "Best lines" pool has its own picks).
+const postedOnly = (cands) => cands.filter((c) => !c.smart);
 
 function skippedNote(cands) {
   return cands.skipped ? `<p class="note">Left out ${cands.skipped} pick${cands.skipped === 1 ? "" : "s"} already in your saved slips.</p>` : "";

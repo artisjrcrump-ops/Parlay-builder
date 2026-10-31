@@ -473,3 +473,22 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 
 .hot-pick { flex: 0 0 64px; align-self: center; }
 .auto-leg:first-child { border-top: 0; padding-top: 0; }
+
+/* Best lines pool */
+.seg { display: flex; gap: 6px; margin: 10px 0; }
+.seg .btn { flex: 1; padding: 8px 6px; font-size: 13px; }
+.smart-sum { display: grid; gap: 4px; font-size: 14px; }
+.warn.small { font-size: 12px; }
+.smart-leg {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  font-size: 14px;
+}
+.smart-leg:first-child { border-top: 0; padding-top: 0; }
+.smart-leg small { display: block; color: var(--muted); font-size: 12px; }
+.smart-leg.off { opacity: 0.45; }
+.leg-toggle.on { background: var(--accent); color: #fff; }

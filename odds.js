@@ -74,7 +74,7 @@ async function loadOddsEvents(game) {
   end.setDate(end.getDate() + 1);
   const url = `${SGO}?leagueID=${league}&bookmakerID=fanduel&startsAfter=${start.toISOString()}`
     + `&startsBefore=${end.toISOString()}&limit=100&apiKey=${encodeURIComponent(key)}`
-    + (sportOf(state.league) === "football" ? "&includeAltLines=true" : ""); // 2+ TD lines can be alternates
+    + "&includeAltLines=true"; // alternate lines price the app's suggested lines (and 2+ TDs)
   const res = await fetch(url);
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body.success === false) throw new Error(body.error || `HTTP ${res.status}`);
@@ -137,7 +137,15 @@ async function getPlayerLines(game, playerName) {
     const over = ev.lines[`${statID}-${pid}-game-ou-over`];
     const under = ev.lines[`${statID}-${pid}-game-ou-under`];
     if (!over && !under) continue;
-    out[statKey] = { line: parseFloat((over || under).overUnder), over: over?.odds, under: under?.odds };
+    // FanDuel's alternate lines for this prop: { line: { over, under } }.
+    const alts = {};
+    for (const [side, o] of [["over", over], ["under", under]]) {
+      for (const a of o?.altLines || []) {
+        const line = parseFloat(a.overUnder);
+        if (Number.isFinite(line) && a.odds) (alts[line] ||= {})[side] = a.odds;
+      }
+    }
+    out[statKey] = { line: parseFloat((over || under).overUnder), over: over?.odds, under: under?.odds, alts };
   }
   Object.assign(out, touchdownLines(ev, pid), doubleDoubleLine(ev, pid));
   return out;
