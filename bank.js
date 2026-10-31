@@ -6,7 +6,7 @@
 // withoutSaved, skippedNote, LEAGUES).
 
 const LADDER_KEY = "pb.ladder";
-const LADDER_DEFAULT = { start: 50, goal: 1000, steps: 8, step: 1, bank: 50, last: null, done: false };
+const LADDER_DEFAULT = { start: 50, goal: 1000, steps: 8, step: 1, bank: 50, last: null, done: false, picks: {} };
 
 function loadLadder() {
   try { return { ...LADDER_DEFAULT, ...JSON.parse(localStorage.getItem(LADDER_KEY) || "{}") }; } catch { return { ...LADDER_DEFAULT }; }
@@ -74,11 +74,21 @@ function bankPairs(cands, multiple) {
   return out;
 }
 
-function ladderHtml(l) {
-  return `<div class="ladder">${rungs(l).reverse().map((r) => `
-    <div class="rung ${r.n < l.step || l.done ? "done" : r.n === l.step ? "now" : ""}">
-      <b>BET ${r.n}</b><span>⚡</span><b>${money(Math.round(r.from))} – ${money(Math.round(r.to))}</b>
-    </div>`).join("")}</div>`;
+const pickText = (c) => ({ text: `${c.player} ${legText(c)}`, odds: c.odds });
+
+// Each rung shows its 2 picks: the ones you bet, or for the current rung the top suggestion.
+function ladderHtml(l, pairs) {
+  return `<div class="ladder">${rungs(l).reverse().map((r) => {
+    const won = r.n < l.step || l.done;
+    const now = r.n === l.step && !l.done;
+    const picks = l.picks?.[r.n] || (now && pairs[0] ? pairs[0].legs.map(pickText) : null);
+    const tag = won ? "✓ Won" : now ? (l.picks?.[r.n] ? "Your bet" : picks ? "Suggested" : "") : "";
+    return `
+    <div class="rung ${won ? "done" : now ? "now" : ""}">
+      <div class="rung-head"><b>BET ${r.n}</b><span>⚡</span><b>${money(Math.round(r.from))} – ${money(Math.round(r.to))}</b>${tag ? `<small>${tag}</small>` : ""}</div>
+      ${picks && (won || now) ? `<div class="rung-picks">${picks.map((p) => `<div><span>${p.text}</span><span>${p.odds}</span></div>`).join("")}</div>` : ""}
+    </div>`;
+  }).join("")}</div>`;
 }
 
 function renderBank(cands, note = "") {
@@ -93,7 +103,7 @@ function renderBank(cands, note = "") {
       <label>Goal $<input class="num" data-ladder="goal" type="number" inputmode="decimal" min="2" value="${l.goal}"></label>
       <label>Bets <input class="num" data-ladder="steps" type="number" inputmode="numeric" min="2" max="15" value="${l.steps}"></label>
     </div>
-    ${ladderHtml(l)}
+    ${ladderHtml(l, pairs)}
     <div class="slip-sum">
       ${l.done ? `<div><b>🎉 Goal reached: ${money(l.bank)}</b>. Tap Restart to start a new ladder.</div>` : `<div><b>Bet ${l.step} of ${l.steps}</b> · bet <b>${money(l.bank)}</b> to get back about <b>${money(target)}</b></div>`}
       <div class="muted">Each bet needs about ${american(m)} (${m.toFixed(2)}x back, stake included). 2 picks, different games.</div>
@@ -114,7 +124,7 @@ function renderBank(cands, note = "") {
             ${c.priceSource === "estimated" ? `<small class="muted">FanDuel "${c.line + 0.5}+ ${c.stat}" market · price estimated, check it in FanDuel</small>` : ""}</div>
             <span class="leg-odds">${c.odds}</span>
           </div>`).join("")}
-        <button class="btn primary" data-bank-use="${i}">Bet this (${money(l.bank)})</button>
+        <button class="btn primary" data-bank-use="${i}">${l.picks?.[l.step] && l.picks[l.step][0].text === pickText(p.legs[0]).text ? "In your slip ✓" : `Bet this (${money(l.bank)})`}</button>
       </div>`).join("")
     : bankEmpty(cands)}
     <p class="note">One loss ends the run, so 8 straight wins is a long shot even with likely picks. Only bet the start amount you're OK losing.</p>`;
@@ -163,9 +173,11 @@ $("sheet-body").addEventListener("click", (e) => {
     slip.stake = Math.round(l.bank * 100) / 100;
     savePref("stake", String(slip.stake));
     l.last = p.dec;
+    l.picks = { ...(l.picks || {}), [l.step]: p.legs.map(pickText) };
     saveLadder(l);
     persist();
-    return openSlip();
+    // Stay on the ladder so the picks show in this bet's row; the slip bar has the bet.
+    return renderBank(sheet.bankCands || null, `<p class="note">Added to your slip. Place it on FanDuel, then come back and tap Won or Lost.</p>`);
   }
   if (d.ladderWon !== undefined) {
     l.bank = Math.round(l.bank * (l.last || ladderMultiple(l)) * 100) / 100;
@@ -173,7 +185,7 @@ $("sheet-body").addEventListener("click", (e) => {
     else l.step += 1;
     l.last = null;
   } else if (d.ladderLost !== undefined) {
-    Object.assign(l, { step: 1, bank: l.start, last: null, done: false });
+    Object.assign(l, { step: 1, bank: l.start, last: null, done: false, picks: {} });
   } else {
     return;
   }
@@ -190,7 +202,7 @@ $("sheet-body").addEventListener("change", (e) => {
   l[field] = field === "steps" ? Math.max(2, Math.min(15, Math.round(v))) : v;
   if (l.goal <= l.start) l.goal = l.start * 2;
   // Changing the plan restarts the ladder.
-  Object.assign(l, { step: 1, bank: l.start, last: null, done: false });
+  Object.assign(l, { step: 1, bank: l.start, last: null, done: false, picks: {} });
   saveLadder(l);
   renderBank(sheet.bankCands || null);
 });

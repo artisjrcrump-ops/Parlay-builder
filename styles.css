@@ -498,14 +498,15 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .bank-setup .num { width: 64px; }
 .ladder { display: grid; gap: 6px; margin: 10px 0; }
 .rung {
-  display: grid;
-  grid-template-columns: 64px 20px 1fr;
-  align-items: center;
   padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--muted);
   font-size: 15px;
 }
+.rung-head { display: grid; grid-template-columns: 64px 20px 1fr auto; align-items: center; }
+.rung-head small { font-size: 12px; font-weight: 600; }
+.rung-picks { display: grid; gap: 4px; margin-top: 6px; font-size: 13px; color: var(--text); }
+.rung-picks div { display: flex; justify-content: space-between; gap: 8px; }
 .rung.done { border-color: #22c55e; color: #22c55e; }
-.rung.now { background: #22c55e; border-color: #22c55e; color: #06210f; }
+.rung.now { border: 2px solid var(--accent); color: var(--text); background: var(--card); }
