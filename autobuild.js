@@ -66,7 +66,8 @@ function stakeLabel() {
 }
 
 // Every qualifying Over/Under leg for one player in one game, scored.
-async function scorePlayer(g, p, totalPct = 0.5) {
+// yourWay: also allow custom lines FanDuel doesn't post (same-game parlays only).
+async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
   if (/out|doubtful/i.test(p.injury || "")) return [];
   const lines = await getPlayerLines(g, p.name);
   if (!lines || !Object.keys(lines).length) return [];
@@ -82,13 +83,13 @@ async function scorePlayer(g, p, totalPct = 0.5) {
     const mu = await matchupFor(opp.id, p.pos, key).catch(() => null);
     const est = (0.6 * avg(last5, statKey) + 0.4 * avg(rows, statKey)) * factor;
     // The app's own best line for this prop (YourWay / alternate), from smartlines.js.
-    const smart = l.yes ? null : smartPick({ rows, statKey, est, l, mu, injury: p.injury });
+    const smart = l.yes ? null : smartPick({ rows, statKey, est, l, mu, injury: p.injury, yourWay });
     if (smart) {
       out.push({
         id: `${g.id}|${p.name}|${PROP_LABEL[key] || key}|${smart.side}|smart`, smart: true,
         player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
         stat: PROP_LABEL[key] || key, statKey: key, gradeKey: statKey, league: state.league, yes: false,
-        ...smart, est: Math.round(est * 10) / 10, postedLine: l.line,
+        ...smart, est: Math.round(est * 10) / 10, postedLine: l.line, edgeAbs: Math.abs(est - smart.line) / Math.max(smart.line, 5),
         oppDef: opp.def, oppN: opp.n, injury: p.injury || "", on: true,
         matchup: mu && (mu.tough || mu.soft) ? (mu.tough ? "tough matchup" : "soft matchup") : "",
       });
@@ -184,6 +185,8 @@ function buildParlays(cands) {
 function reason(l) {
   const bits = [`est ${l.est}`, `hit ${l.l5} last 5`];
   if (l.oppDef) bits.push(`vs ${ordinal(l.oppDef)} D`);
+  if (l.postedLine != null && l.line !== l.postedLine) bits.push(`FanDuel posted ${l.postedLine}`);
+  if (l.priceSource === "estimated") bits.push("YourWay line, price estimated");
   if (l.matchup) bits.push(l.matchup);
   if (l.injury) bits.push(l.injury);
   return bits.join(" · ");
@@ -224,11 +227,11 @@ function renderParlays(parlays, opts = {}) {
 
 const AUTO_MODES = {
   basketball: [
-    ["smart", "Best lines pool (YourWay)"], ["mixed", "Mixed: 5 themed parlays"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
+    ["smart", "Best lines pool"], ["mixed", "Mixed: 5 themed parlays"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
     ["assists", "Assists"], ["points", "Points"], ["pra", "Pts + Reb + Ast"],
   ],
   football: [
-    ["smart", "Best lines pool (YourWay)"], ["mixed", "Mixed: 5 themed parlays"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
+    ["smart", "Best lines pool"], ["mixed", "Mixed: 5 themed parlays"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
     ["rushingYards", "Rushing yards"], ["receivingYards", "Receiving yards"], ["receptions", "Receptions"],
   ],
 };

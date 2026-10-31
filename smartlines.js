@@ -72,7 +72,7 @@ function estimatePrice(l, sd, line, side) {
 // The best line for one prop, or null. Considers FanDuel's posted line, its alternates and
 // YourWay-style lines in whole steps toward the estimate's safe side; picks the one with the
 // best value (chance x payout) among lines that clear the hit-chance and edge floors.
-function smartPick({ rows, statKey, est, l, mu, injury }) {
+function smartPick({ rows, statKey, est, l, mu, injury, yourWay = false }) {
   if (!Number.isFinite(l.line) || !Number.isFinite(est) || rows.length < 5) return null;
   if (/out|doubtful/i.test(injury || "")) return null;
   const mean = rows.reduce((t, r) => t + (r.stats[statKey] || 0), 0) / rows.length;
@@ -88,7 +88,8 @@ function smartPick({ rows, statKey, est, l, mu, injury }) {
       if (Math.abs(line - est) > 2.5 * sd && step > 0) break;
       const posted = step === 0 ? (side === "over" ? l.over : l.under) : null;
       const alt = l.alts?.[line]?.[side];
-      const odds = posted || alt || (step > 0 ? estimatePrice(l, sd, line, side) : null);
+      // Lines FanDuel doesn't post only work as YourWay lines inside a same-game parlay.
+      const odds = posted || alt || (yourWay && step > 0 ? estimatePrice(l, sd, line, side) : null);
       const dec = decimal(odds);
       if (!dec || dec < 1.08) continue;
       let prob = sideProb(rows, statKey, est, sd, line, side) - (injury ? 0.05 : 0);
@@ -188,14 +189,14 @@ function renderSmart(header, cands) {
       <button class="btn primary" data-smart-add>Add checked to slip</button>
       <button class="btn" data-open-slip>Open slip</button>
     </div>
-    <p class="note">For each player the app picks the line it thinks is most worth playing, which may be lower (or higher) than FanDuel's posted line, so set it in YourWay. Hit % is the app's estimate from his games, tonight's matchup and how the opponent defends that stat. Tap ✓ to drop a leg.</p>
+    <p class="note">For each player the app picks the line it thinks is most worth playing from the lines FanDuel actually offers: the main line or one of its alternate lines, so every leg can go in a multi-game parlay. Hit % is the app's estimate from his games, tonight's matchup and how the opponent defends that stat. Tap ✓ to drop a leg.</p>
     <div class="auto">
       ${pool.map((c) => `
         <div class="smart-leg">
           <button class="leg-toggle" data-smart-leg="${c.id}" aria-label="Include leg"></button>
           <div class="leg-main">
             <div><b>${c.player}</b> ${legText(c)} <span class="muted">${c.team} vs ${c.opp}</span></div>
-            <small>hits ~${Math.round(c.prob * 100)}% · FanDuel posted ${c.postedLine}${c.line !== c.postedLine ? ` → ${c.side === "over" ? "O" : "U"} ${c.line}` : ""} · ${reason(c)}</small>
+            <small>hits ~${Math.round(c.prob * 100)}% · ${reason(c)}</small>
             <small class="muted">${c.priceSource === "estimated" ? "Price estimated, check YourWay" : c.priceSource}</small>
           </div>
           <span class="leg-odds">${priceText(c)}</span>

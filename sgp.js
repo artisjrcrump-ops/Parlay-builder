@@ -79,7 +79,7 @@ async function sgpCandidates(g, progress) {
 
   let done = 0;
   const results = await pool(players, 6, async (p) => {
-    const legs = await scorePlayer(g, p);
+    const legs = await scorePlayer(g, p, 0.5, true);
     progress(`Checking ${g.away.abbr} @ ${g.home.abbr} players… ${++done}/${players.length}`);
     return legs.map((l) => ({ ...l, teamSide: p.side }));
   });
@@ -100,9 +100,10 @@ async function runSgp(gameId) {
   const status = (msg) => { $("sheet-body").innerHTML = `<p class="status">${msg}</p>`; };
   try {
     const cands = withoutSaved(await sgpCandidates(g, status));
-    renderParlays(buildSgps(g, postedOnly(cands)), {
+    // Posted lines plus YourWay lines; one leg per player and stat, so each prop uses whichever scores better.
+    renderParlays(buildSgps(g, cands), {
       header: skippedNote(cands),
-      intro: "Each same-game parlay follows one game script so its legs help each other. No pick appears in more than one.",
+      intro: "Each same-game parlay follows one game script so its legs help each other. Some legs use YourWay lines (a custom line FanDuel lets you set in same-game parlays); their prices are estimates until you set them in FanDuel. No pick appears in more than one.",
       outro: "FanDuel reprices same-game parlays for correlation, so the real payout will usually be lower than shown. These are model picks, not guarantees.",
       empty: "Not enough strong FanDuel props in this game yet. Props often post closer to tip-off.",
     });
