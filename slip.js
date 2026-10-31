@@ -21,7 +21,7 @@ const slip = {
 
 function persist() {
   // Pick up FanDuel/DraftKings bet-slip links for new legs (odds.js) before saving.
-  if (typeof betLinksFor === "function") slip.legs.forEach((l) => { if (!l.links?.dkGame) l.links = betLinksFor(l) || l.links; });
+  if (typeof betLinksFor === "function") slip.legs.forEach((l) => { if (!l.links?.src) l.links = betLinksFor(l) || l.links; });
   saveList("pb.slip", slip.legs);
   renderSlipBar();
 }
