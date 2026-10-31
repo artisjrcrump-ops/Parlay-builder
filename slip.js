@@ -20,6 +20,8 @@ const slip = {
 };
 
 function persist() {
+  // Pick up FanDuel/DraftKings bet-slip links for new legs (odds.js) before saving.
+  if (typeof betLinksFor === "function") slip.legs.forEach((l) => { if (!l.links) l.links = betLinksFor(l) || undefined; });
   saveList("pb.slip", slip.legs);
   renderSlipBar();
 }
@@ -127,6 +129,33 @@ function openSlip() {
   openSheet();
 }
 
+// One link that opens FanDuel / DraftKings with every linked leg already in the bet slip.
+function bookLink(legs, book) {
+  const links = legs.map((l) => l.links?.[book]).filter(Boolean);
+  if (!links.length) return null;
+  if (book === "fd") {
+    const parts = links.map((u, i) => {
+      const q = new URL(u).searchParams;
+      return `marketId[${i}]=${encodeURIComponent(q.get("marketId"))}&selectionId[${i}]=${encodeURIComponent(q.get("selectionId"))}`;
+    });
+    return { url: `https://sportsbook.fanduel.com/addToBetslip?${parts.join("&")}`, n: links.length };
+  }
+  const first = new URL(links[0]);
+  const outcomes = links.map((u) => new URL(u).searchParams.get("outcomes")).filter(Boolean);
+  return { url: `${first.origin}${first.pathname}?outcomes=${outcomes.map(encodeURIComponent).join("+")}`, n: outcomes.length };
+}
+
+function placeButtons(legs) {
+  if (!legs.length) return "";
+  const fd = bookLink(legs, "fd");
+  const dk = bookLink(legs, "dk");
+  if (!fd && !dk) return `<p class="note">No FanDuel/DraftKings bet-slip links for these legs yet (alternate and estimated lines usually don't have one). Reload the picks after props post, or add them in the app by hand.</p>`;
+  const btn = (b, name) => b ? `<a class="btn ${name === "FanDuel" ? "primary" : ""} place-btn" href="${b.url}" target="_blank" rel="noopener">Place it on ${name}${b.n < legs.length ? ` (${b.n} of ${legs.length})` : ""} ↗</a>` : "";
+  const missing = legs.filter((l) => !l.links?.fd).map((l) => l.player);
+  return `<div class="settings-actions place-row">${btn(fd, "FanDuel")}${btn(dk, "DraftKings")}</div>
+    ${missing.length && fd ? `<p class="note">Add by hand in FanDuel: ${missing.join(", ")}.</p>` : ""}`;
+}
+
 function renderSlip() {
   const m = slipMath(slip.legs);
   const inRange = m.payout >= TARGET.low && m.payout <= TARGET.high;
@@ -156,6 +185,7 @@ function renderSlip() {
       ${m.sameGame ? `<p class="warn">Some legs are from the same game. FanDuel reprices same-game parlays, so the real payout will usually be lower than this.</p>` : ""}
       <p class="note">Odds are FanDuel's standard lines. YourWay lines you move in FanDuel will change the price.</p>
     </div>
+    ${placeButtons(m.on)}
     <div class="settings-actions">
       <button id="slip-save" class="btn primary">Save slip</button>
       <button id="slip-clear" class="btn">Clear</button>

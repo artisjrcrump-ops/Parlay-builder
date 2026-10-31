@@ -52,10 +52,38 @@ function writeCache(key, data) {
   try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), data })); } catch { /* quota or private mode */ }
 }
 
-function trimLine(fd) {
+function trimLine(fd, dk) {
   if (!fd) return fd;
-  const alt = Array.isArray(fd.altLines) ? fd.altLines.map((a) => ({ odds: a.odds, overUnder: a.overUnder })) : undefined;
-  return { odds: fd.odds, overUnder: fd.overUnder, available: fd.available, altLines: alt };
+  const alt = Array.isArray(fd.altLines)
+    ? fd.altLines.map((a) => ({ odds: a.odds, overUnder: a.overUnder, link: a.deeplink })) : undefined;
+  // Bet-slip links: FanDuel's for this line, DraftKings' for the same line when it has one.
+  const dkLinks = {};
+  for (const d of dk ? [dk, ...(dk.altLines || [])] : []) if (d.deeplink) dkLinks[parseFloat(d.overUnder)] = d.deeplink;
+  return { odds: fd.odds, overUnder: fd.overUnder, available: fd.available, altLines: alt, link: fd.deeplink, dk: dkLinks };
+}
+
+// Bet-slip links by game, player, side and line, filled as props load; slip legs pick them up
+// (persist in slip.js) so "Place on FanDuel / DraftKings" can open the book with the picks in it.
+const BET_LINKS = {};
+const linkKey = (gameId, player, side, line) => `${gameId}|${norm(player)}|${side}|${parseFloat(line)}`;
+
+function noteLinks(game, player, stat, side, o) {
+  if (!o) return;
+  const add = (line, fd, dk) => {
+    if (!fd && !dk) return;
+    const k = linkKey(game.id, player, side, line);
+    (BET_LINKS[k] ||= []).push({ stat, fd, dk });
+  };
+  const main = parseFloat(o.overUnder);
+  add(Number.isFinite(main) ? main : 0.5, o.link, o.dk?.[main]);
+  for (const a of o.altLines || []) add(parseFloat(a.overUnder), a.link, o.dk?.[parseFloat(a.overUnder)]);
+}
+
+function betLinksFor(leg) {
+  const list = BET_LINKS[linkKey(leg.gameId, leg.player, leg.side === "under" ? "under" : "over", leg.line)];
+  if (!list) return null;
+  const hit = list.find((x) => x.stat === leg.gradeKey) || (list.length === 1 ? list[0] : null);
+  return hit ? { fd: hit.fd || null, dk: hit.dk || null } : null;
 }
 
 // One request per league per day, cached, to stay inside the free monthly allowance.
@@ -64,7 +92,7 @@ async function loadOddsEvents(game) {
   if (!key) return null;
   const league = SGO_LEAGUE[state.league];
   const day = ymd(game.date);
-  const cacheKey = `pb.odds.${league}.${day}`;
+  const cacheKey = `pb.odds.v2.${league}.${day}`;
   const cached = readCache(cacheKey);
   if (cached) return cached;
 
@@ -72,7 +100,7 @@ async function loadOddsEvents(game) {
   start.setHours(0, 0, 0, 0);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
-  const url = `${SGO}?leagueID=${league}&bookmakerID=fanduel&startsAfter=${start.toISOString()}`
+  const url = `${SGO}?leagueID=${league}&bookmakerID=fanduel,draftkings&startsAfter=${start.toISOString()}`
     + `&startsBefore=${end.toISOString()}&limit=100&apiKey=${encodeURIComponent(key)}`
     + "&includeAltLines=true"; // alternate lines price the app's suggested lines (and 2+ TDs)
   const res = await fetch(url);
@@ -86,7 +114,7 @@ async function loadOddsEvents(game) {
     players: Object.fromEntries(Object.values(ev.players || {}).map((p) => [norm(p.name), p.playerID])),
     lines: Object.fromEntries(Object.entries(ev.odds || {})
       .filter(([id]) => /-game-(ou-over|ou-under|yn-yes)$/.test(id))
-      .map(([id, o]) => [id, trimLine(o.byBookmaker?.fanduel)])
+      .map(([id, o]) => [id, trimLine(o.byBookmaker?.fanduel, o.byBookmaker?.draftkings)])
       .filter(([, fd]) => fd && fd.available !== false)),
   }));
   writeCache(cacheKey, events);
@@ -146,6 +174,12 @@ async function getPlayerLines(game, playerName) {
       }
     }
     out[statKey] = { line: parseFloat((over || under).overUnder), over: over?.odds, under: under?.odds, alts };
+    noteLinks(game, playerName, statKey, "over", over);
+    noteLinks(game, playerName, statKey, "under", under);
+  }
+  for (const [id, stat] of [["touchdowns", "tds"], ["doubleDouble", "dd"]]) {
+    noteLinks(game, playerName, stat, "over", ev.lines[`${id}-${pid}-game-yn-yes`]);
+    noteLinks(game, playerName, stat, "over", ev.lines[`${id}-${pid}-game-ou-over`]);
   }
   Object.assign(out, touchdownLines(ev, pid), doubleDoubleLine(ev, pid));
   return out;

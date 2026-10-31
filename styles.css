@@ -539,3 +539,4 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .cheat-row:first-of-type { border-top: 0; }
 .cheat-hit { font-weight: 700; white-space: nowrap; }
 .cheat-row.added .cheat-hit { color: #22c55e; }
+.place-row .place-btn { flex: 1; text-align: center; text-decoration: none; }
