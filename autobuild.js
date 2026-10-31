@@ -69,9 +69,31 @@ async function benchPlayers(g, leaders) {
   const out = [];
   for (const side of ["away", "home"]) {
     const roster = await loadRoster(g[side].id).catch(() => []);
-    roster.filter((p) => !ids.has(p.id)).slice(0, 10)
-      .forEach((p) => out.push({ ...p, side, bench: true, injury: leaders.injuries?.[p.id] }));
+    roster.filter((p) => !ids.has(p.id)).slice(0, 15)
+      .forEach((p) => out.push({ ...p, side, injury: leaders.injuries?.[p.id] }));
   }
+  return out;
+}
+
+// How much a player plays: minutes in basketball, touches (targets + carries + passes) in football.
+async function usage(p) {
+  const { rows } = await loadGameLog(p.id).catch(() => ({ rows: [] }));
+  const recent = rows.slice(0, 10);
+  if (!recent.length) return 0;
+  const avgOf = (k) => recent.reduce((t, r) => t + (parseFloat(r.stats[k]) || 0), 0) / recent.length;
+  return sportOf(state.league) === "basketball"
+    ? avgOf("minutes")
+    : avgOf("receivingTargets") + avgOf("rushingAttempts") + avgOf("passingAttempts");
+}
+
+// Starters for one team: top 5 by minutes in basketball; QB1, RB1, WR1-3, TE1 by touches in football.
+async function starterIds(players) {
+  const u = await Promise.all(players.map(usage));
+  const ranked = players.map((p, i) => ({ p, u: u[i] })).sort((a, b) => b.u - a.u);
+  if (sportOf(state.league) === "basketball") return new Set(ranked.slice(0, 5).map((x) => x.p.id));
+  const slots = { QB: 1, RB: 1, WR: 3, TE: 1 };
+  const out = new Set();
+  for (const { p } of ranked) if ((slots[p.pos] ?? 1) > 0) { out.add(p.id); slots[p.pos] = (slots[p.pos] ?? 1) - 1; }
   return out;
 }
 
@@ -195,16 +217,26 @@ async function buildCandidates(progress) {
   const results = await pool(jobs, 6, async ({ g, p }) => {
     const legs = await scorePlayer(g, p, totalPct(g.odds?.total || 0));
     progress(`Checking players… ${++done}/${jobs.length}`);
-    if (!isBlowout(g)) return legs;
-    for (const l of legs) {
-      l.blowout = true;
-      l.bench = !!p.bench;
-      // Starters' overs in a likely blowout carry minutes risk.
-      if (!p.bench && l.side === "over") { l.prob -= 0.04; l.value -= 0.04; }
-      if (p.bench) l.matchup = [l.matchup, "bench, blowout spot"].filter(Boolean).join(" · ");
-    }
     return legs;
   });
+
+  // Projected blowouts: backups get garbage-time minutes, starters may sit late.
+  for (const g of blowouts) {
+    for (const side of ["away", "home"]) {
+      const idx = jobs.map((j, i) => i).filter((i) => jobs[i].g === g && jobs[i].p.side === side);
+      const starters = await starterIds(idx.map((i) => jobs[i].p));
+      for (const i of idx) {
+        const bench = !starters.has(jobs[i].p.id);
+        for (const l of results[i] || []) {
+          l.blowout = true;
+          l.bench = bench;
+          const over = l.side === "over" || l.yes;
+          if (bench && over) { l.prob += 0.03; l.value += 0.03; l.matchup = [l.matchup, "backup, blowout spot"].filter(Boolean).join(" · "); }
+          if (!bench && over) { l.prob -= 0.04; l.value -= 0.04; }
+        }
+      }
+    }
+  }
   return results.flat().filter(Boolean).sort((a, b) => rank(b) - rank(a));
 }
 
