@@ -513,3 +513,6 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
 .chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: inherit; font-size: 13px; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.actions-row { flex-wrap: wrap; }
+.actions-row .live-btn { flex-basis: 100%; background: #f97316; border-color: #f97316; }
+.actions-row [hidden] { display: none; }
