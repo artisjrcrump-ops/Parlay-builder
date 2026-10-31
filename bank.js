@@ -28,8 +28,28 @@ function rungs(l) {
 
 // Best 2-pick parlays for this rung: picks from different games, together paying close to the
 // ladder multiple (a little over is fine), ranked by the chance both hit.
+// Short-priced legs: the app's safer lines first, then posted lines at short odds.
+function bankLegs(cands) {
+  const seen = new Set();
+  return [...cands.filter((c) => c.bank), ...cands.filter((c) => !c.smart && c.dec <= 1.8)]
+    .filter((c) => { const k = `${c.player}|${c.stat}`; return !seen.has(k) && seen.add(k); })
+    .sort((a, b) => b.prob - a.prob);
+}
+
+function bankEmpty(cands) {
+  const games = state.games.filter((g) => g.state === "pre").length;
+  const legs = bankLegs(cands);
+  const why = games < 2
+    ? `Only ${games} game${games === 1 ? " hasn't" : "s haven't"} started yet on this day, and the 2 picks have to come from different games.`
+    : legs.length < 2
+      ? `Only ${legs.length} pick${legs.length === 1 ? "" : "s"} at short odds cleared the app's bar today. FanDuel posts more props closer to game time.`
+      : "None of today's short-odds picks are in different games.";
+  return `<p class="status">${why}</p>
+    <div class="settings-actions"><button class="btn primary" data-bank-tomorrow>See tomorrow's picks</button></div>`;
+}
+
 function bankPairs(cands, multiple) {
-  const legs = cands.filter((c) => c.bank).sort((a, b) => b.prob - a.prob).slice(0, 80);
+  const legs = bankLegs(cands).slice(0, 80);
   const pairs = [];
   for (let i = 0; i < legs.length; i++) {
     for (let j = i + 1; j < legs.length; j++) {
@@ -95,7 +115,7 @@ function renderBank(cands, note = "") {
           </div>`).join("")}
         <button class="btn primary" data-bank-use="${i}">Bet this (${money(l.bank)})</button>
       </div>`).join("")
-    : `<p class="status">No 2-pick combos at these prices on this slate. Try another day or sport.</p>`}
+    : bankEmpty(cands)}
     <p class="note">One loss ends the run, so 8 straight wins is a long shot even with likely picks. Only bet the start amount you're OK losing.</p>`;
 }
 
@@ -111,7 +131,9 @@ async function openBank() {
     sheet.bankCands = cands;
     renderBank(cands, skippedNote(cands));
   } catch (err) {
-    renderBank(null, `<p class="status">${/No upcoming/.test(err.message) ? "No upcoming games on this day. Change the day or sport on the main screen." : `Couldn't find picks (${err.message}).`}</p>`);
+    renderBank(null, /No upcoming/.test(err.message)
+      ? `<p class="status">Every game on this day has started.</p><div class="settings-actions"><button class="btn primary" data-bank-tomorrow>See tomorrow's picks</button></div>`
+      : `<p class="status">Couldn't find picks (${err.message}).</p>`);
   }
 }
 
@@ -121,6 +143,13 @@ $("sheet-body").addEventListener("click", (e) => {
   const t = e.target.closest("button");
   if (!t) return;
   const d = t.dataset;
+  if (d.bankTomorrow !== undefined) {
+    const next = new Date(state.date);
+    next.setDate(next.getDate() + 1);
+    state.date = next;
+    t.textContent = "Loading…";
+    return load().then(openBank);
+  }
   const l = loadLadder();
   if (d.bankUse !== undefined) {
     const p = sheet.bankPairs?.[+d.bankUse];
