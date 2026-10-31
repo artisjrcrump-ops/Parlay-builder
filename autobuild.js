@@ -202,6 +202,7 @@ function buildParlays(cands) {
 
 function reason(l) {
   const bits = [`est ${l.est}`, `hit ${l.l5} last 5`];
+  if (l.sport) bits.unshift(l.sport);
   if (l.oppDef) bits.push(`vs ${ordinal(l.oppDef)} D`);
   if (l.postedLine != null && l.line !== l.postedLine) bits.push(`FanDuel posted ${l.postedLine}`);
   if (l.priceSource === "estimated" && !l.bank) bits.push("YourWay line, price estimated");
@@ -287,13 +288,22 @@ function buildStatParlays(cands, statKey, label) {
   return out;
 }
 
+// Prop-type options for whichever sports are on (basketball's, football's, or both).
+function autoModes(leagues) {
+  const sports = new Set(leagues.map(sportOf));
+  const seen = new Set();
+  return ["basketball", "football"].filter((s) => sports.has(s))
+    .flatMap((s) => AUTO_MODES[s])
+    .filter(([k]) => !seen.has(k) && seen.add(k));
+}
+
 function renderAuto() {
-  const c = sheet.autoCache;
-  const modes = AUTO_MODES[sportOf(state.league)];
+  const c = sheet.autoAll;
+  const modes = autoModes(c.leagues);
   const mode = modes.some(([k]) => k === sheet.autoMode) ? sheet.autoMode : "smart";
   const label = modes.find(([k]) => k === mode)[1];
   const all = withoutSaved(c.cands);
-  const header = `<label class="mode"><span>Build</span><select id="auto-mode">${modes
+  const header = `${sportChips()}${c.failed.length ? `<p class="note">Couldn't load ${c.failed.join(", ")} right now.</p>` : ""}<label class="mode"><span>Build</span><select id="auto-mode">${modes
     .map(([k, l]) => `<option value="${k}" ${k === mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>${skippedNote(all)}`;
   sheet.smart = null;
   if (mode === "smart") return renderSmart(header, all);
@@ -303,7 +313,7 @@ function renderAuto() {
     header,
     intro: mode === "mixed" ? undefined
       : `Only ${label.toLowerCase()} props. Each pick is checked against how tonight's opponent defends that stat at the player's position, plus recent form, season hit rate and the estimate vs FanDuel's line. No pick appears in more than one parlay.`,
-    empty: `Not enough strong ${mode === "mixed" ? "" : `${label.toLowerCase()} `}picks on this slate. Try another prop type, day or league.`,
+    empty: `Not enough strong ${mode === "mixed" ? "" : `${label.toLowerCase()} `}picks on this slate. Try another prop type, day or sport.`,
   });
 }
 
@@ -335,20 +345,19 @@ async function slateCandidates(progress) {
 
 async function openAutoParlays() {
   sheet.game = null;
+  sheet.reopen = openAutoParlays;
   $("sheet-back").hidden = true;
-  $("sheet-title").textContent = `Auto parlays · ${LEAGUES[state.league].label}`;
+  $("sheet-title").textContent = "⚡ Auto parlays";
   openSheet();
-  if (!loadPref("sgoKey", "")) {
-    $("sheet-body").innerHTML = `<p class="status">Add your SportsGameOdds key in ⚙︎ Settings first. Auto parlays need FanDuel's lines.</p>`;
-    return;
-  }
-  const status = (msg) => { $("sheet-body").innerHTML = `<p class="status">${msg}</p>`; };
-  try {
-    await slateCandidates(status);
-    renderAuto();
-  } catch (err) {
-    status(`Couldn't build parlays (${err.message}).`);
-  }
+  const status = (msg) => { $("sheet-body").innerHTML = `${sportChips()}<p class="status">${msg}</p>`; };
+  if (!loadPref("sgoKey", "")) return status("Add your SportsGameOdds key in ⚙︎ Settings first. Auto parlays need FanDuel's lines.");
+  status("Finding picks…");
+  // Every sport that's on, scored once per day (10 min); switching prop types reuses it.
+  const r = await sportsCandidates(status);
+  if (!r) return;
+  if (!r.games) return status("No games left to start on this day in the sports you picked. Use ‹ › on the main screen to change the day.");
+  sheet.autoAll = { cands: r.all.sort((a, b) => rank(b) - rank(a)), leagues: r.leagues, failed: r.failed };
+  renderAuto();
 }
 
 $("auto").addEventListener("click", openAutoParlays);

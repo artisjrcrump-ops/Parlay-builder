@@ -120,7 +120,7 @@ function renderBank(cands, note = "") {
         <small class="auto-why">Both hit about ${Math.round(p.prob * 100)}% of the time${p.fits ? "" : " · pays less than this rung needs"}</small>
         ${p.legs.map((c) => `
           <div class="auto-leg">
-            <div><b>${c.player}</b> ${legText(c)} <span class="muted">${c.sport ? `${c.sport} · ` : ""}${c.team} vs ${c.opp}</span><br>
+            <div><b>${c.player}</b> ${legText(c)} <span class="muted">${c.team} vs ${c.opp}</span><br>
             <small>hits ~${Math.round(c.prob * 100)}% · ${reason(c)}</small>
             ${c.priceSource === "estimated" ? `<small class="muted">FanDuel "${c.line + 0.5}+ ${c.stat}" market · price estimated, check it in FanDuel</small>` : ""}</div>
             <span class="leg-odds">${c.odds}</span>
@@ -131,73 +131,22 @@ function renderBank(cands, note = "") {
     <p class="note">One loss ends the run, so 8 straight wins is a long shot even with likely picks. Only bet the start amount you're OK losing.</p>`;
 }
 
-// Sports the Bank builder mixes, saved on this device. All four by default.
-function bankLeagues() {
-  const saved = loadPref("bankLeagues", "");
-  const keys = saved ? saved.split(",").filter((k) => LEAGUES[k]) : Object.keys(LEAGUES);
-  return keys.length ? keys : Object.keys(LEAGUES);
-}
-
-function leagueChips() {
-  const on = bankLeagues();
-  return `<div class="chips">${Object.entries(LEAGUES).map(([k, lg]) =>
-    `<button class="chip ${on.includes(k) ? "on" : ""}" data-bank-league="${k}">${lg.label}</button>`).join("")}</div>`;
-}
-
-// Score one league's slate for the board's day. The scoring code reads state.league and
-// state.games, so swap them in for the run and put the board's back afterwards.
-async function leagueCandidates(key, progress) {
-  const keep = { league: state.league, games: state.games };
-  const lg = LEAGUES[key];
-  const cacheKey = `${key}.${ymd(state.date)}`;
-  sheet.bankCache ||= {};
-  const hit = sheet.bankCache[cacheKey];
-  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit;
-  try {
-    state.league = key;
-    const [board, ranks] = await Promise.all([
-      getJSON(`${SITE}${lg.path}/scoreboard?dates=${ymd(state.date)}${lg.query}`),
-      loadRanks(key).catch(() => state.ranks[key] || {}),
-    ]);
-    state.ranks[key] = ranks;
-    state.games = (board.events || []).map((ev) => parseGame(ev, ranks));
-    const pre = state.games.filter((g) => g.state === "pre").length;
-    const cands = pre ? await buildCandidates((msg) => progress(`${lg.label}: ${msg}`)) : [];
-    cands.forEach((c) => { c.sport = lg.label; });
-    sheet.bankCache[cacheKey] = { at: Date.now(), pre, cands };
-    return sheet.bankCache[cacheKey];
-  } finally {
-    state.league = keep.league;
-    state.games = keep.games;
-  }
-}
-
 async function openBank() {
   sheet.game = null;
   $("sheet-back").hidden = true;
   $("sheet-title").textContent = "🏦 Bank builder";
   openSheet();
-  const status = (msg) => renderBank(null, `${leagueChips()}<p class="status">${msg}</p>`);
+  const status = (msg) => renderBank(null, `${sportChips()}<p class="status">${msg}</p>`);
+  sheet.reopen = openBank;
   status("Finding picks…");
   if (!loadPref("sgoKey", "")) return status("Add your SportsGameOdds key in ⚙︎ Settings first.");
-  const token = (sheet.bankToken = (sheet.bankToken || 0) + 1);
-  let all = [];
-  let games = 0;
-  const failed = [];
-  for (const key of bankLeagues()) {
-    try {
-      const r = await leagueCandidates(key, status);
-      all = all.concat(r.cands);
-      games += r.pre;
-    } catch {
-      failed.push(LEAGUES[key].label);
-    }
-    if (token !== sheet.bankToken) return; // reopened or sports changed meanwhile
-  }
+  const r = await sportsCandidates(status);
+  if (!r) return; // reopened or sports changed meanwhile
+  const { all, games, failed } = r;
   const cands = withoutSaved(all.sort((a, b) => rank(b) - rank(a)));
   sheet.bankCands = cands;
   sheet.bankGames = games;
-  const note = `${leagueChips()}${skippedNote(cands)}${failed.length ? `<p class="note">Couldn't load ${failed.join(", ")} right now.</p>` : ""}`;
+  const note = `${sportChips()}${skippedNote(cands)}${failed.length ? `<p class="note">Couldn't load ${failed.join(", ")} right now.</p>` : ""}`;
   sheet.bankNote = note;
   renderBank(cands, note);
 }
@@ -208,19 +157,11 @@ $("sheet-body").addEventListener("click", (e) => {
   const t = e.target.closest("button");
   if (!t) return;
   const d = t.dataset;
-  if (d.bankLeague) {
-    const on = new Set(bankLeagues());
-    on.has(d.bankLeague) ? on.delete(d.bankLeague) : on.add(d.bankLeague);
-    if (!on.size) return;
-    savePref("bankLeagues", [...on].join(","));
-    return openBank();
-  }
   if (d.bankTomorrow !== undefined) {
     const next = new Date(state.date);
     next.setDate(next.getDate() + 1);
     state.date = next;
     t.textContent = "Loading…";
-    sheet.bankCache = {};
     return load().then(openBank);
   }
   const l = loadLadder();

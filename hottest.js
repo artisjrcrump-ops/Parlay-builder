@@ -15,9 +15,15 @@ function hottestPicks(cands) {
     .slice(0, HOT_COUNT);
 }
 
+// "all" = every sport turned on with the chips; otherwise one league (and the board follows it).
+const hotSport = () => loadPref("hotSport", "all");
+
 function hotHeader() {
-  return `<label class="mode"><span>Sport</span><select id="hot-league">${Object.entries(LEAGUES)
-    .map(([k, lg]) => `<option value="${k}" ${k === state.league ? "selected" : ""}>${lg.label}</option>`).join("")}</select></label>`;
+  const pick = hotSport();
+  return `<label class="mode"><span>Sport</span><select id="hot-league">
+    <option value="all" ${pick === "all" ? "selected" : ""}>All sports</option>${Object.entries(LEAGUES)
+    .map(([k, lg]) => `<option value="${k}" ${pick !== "all" && k === state.league ? "selected" : ""}>${lg.label}</option>`).join("")}</select></label>
+    ${pick === "all" ? sportChips() : ""}`;
 }
 
 function renderHottest(picks, note = sheet.hotNote || "") {
@@ -47,15 +53,25 @@ async function openHottest() {
   sheet.game = null;
   $("sheet-back").hidden = true;
   $("sheet-title").textContent = "🔥 10 hottest picks";
+  sheet.reopen = openHottest;
   openSheet();
   const status = (msg) => { $("sheet-body").innerHTML = `${hotHeader()}<p class="status">${msg}</p>`; };
   if (!loadPref("sgoKey", "")) return status("Add your SportsGameOdds key in ⚙︎ Settings first. Hottest picks need FanDuel's lines.");
   try {
-    const cands = withoutSaved(await slateCandidates(status));
+    let raw;
+    if (hotSport() === "all") {
+      const r = await sportsCandidates(status);
+      if (!r) return;
+      if (!r.games) throw new Error("No upcoming games");
+      raw = r.all;
+    } else {
+      raw = await slateCandidates(status);
+    }
+    const cands = withoutSaved(raw);
     renderHottest(hottestPicks(postedOnly(cands)), skippedNote(cands));
   } catch (err) {
     status(/No upcoming/.test(err.message)
-      ? `No upcoming ${LEAGUES[state.league].label} games on this day. Use ‹ › on the main screen to change the day.`
+      ? `No upcoming ${hotSport() === "all" ? "" : `${LEAGUES[state.league].label} `}games on this day. Use ‹ › on the main screen to change the day.`
       : `Couldn't find picks (${err.message}).`);
   }
 }
@@ -64,7 +80,9 @@ $("hot").addEventListener("click", openHottest);
 
 $("sheet-body").addEventListener("change", async (e) => {
   if (e.target.id !== "hot-league") return;
-  // Picking a sport switches the board too, so the picks and the games match.
+  savePref("hotSport", e.target.value);
+  if (e.target.value === "all") return openHottest();
+  // Picking one sport switches the board too, so the picks and the games match.
   state.league = e.target.value;
   savePref("league", state.league);
   renderTabs();
