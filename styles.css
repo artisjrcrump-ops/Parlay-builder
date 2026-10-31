@@ -510,3 +510,6 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .rung-picks div { display: flex; justify-content: space-between; gap: 8px; }
 .rung.done { border-color: #22c55e; color: #22c55e; }
 .rung.now { border: 2px solid var(--accent); color: var(--text); background: var(--card); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: inherit; font-size: 13px; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
