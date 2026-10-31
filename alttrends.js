@@ -48,10 +48,10 @@ function altLadder({ rows, statKey, l, opp, home }) {
 }
 
 // The best alt leg for a prop: the highest rung cleared in 4+ of the last 5 and 70%+ of all
-// games, priced somewhere FanDuel would actually offer it (about -900 to -110).
+// games, priced like the alt lines worth playing (about -400 to -110).
 function altTrend(args) {
   const ladder = altLadder(args).filter((s) => s.l5n >= 4 && s.l5 >= s.l5n - 1 && rate(s.all, s.n) >= 0.7
-    && s.dec && s.dec >= 1.11 && s.dec <= 1.95);
+    && s.dec && s.dec >= 1.25 && s.dec <= 1.95);
   return ladder.length ? ladder[ladder.length - 1] : null;
 }
 
