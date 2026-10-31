@@ -134,11 +134,15 @@ function bookLink(legs, book) {
   const links = legs.map((l) => l.links?.[book]).filter(Boolean);
   if (!links.length) return null;
   if (book === "fd") {
-    const parts = links.map((u, i) => {
-      const q = new URL(u).searchParams;
-      return `marketId[${i}]=${encodeURIComponent(q.get("marketId"))}&selectionId[${i}]=${encodeURIComponent(q.get("selectionId"))}`;
-    });
-    return { url: `https://sportsbook.fanduel.com/addToBetslip?${parts.join("&")}`, n: links.length };
+    const ids = links.map((u) => new URL(u).searchParams).map((q) => [q.get("marketId"), q.get("selectionId")]);
+    const base = "https://sportsbook.fanduel.com/addToBetslip?";
+    // FanDuel's multi-leg format isn't documented; three ways to join legs, first one is the button.
+    const variants = [
+      ids.map(([m]) => `marketId[]=${m}`).concat(ids.map(([, x]) => `selectionId[]=${x}`)).join("&"),
+      ids.map(([m, x], i) => `marketId[${i}]=${m}&selectionId[${i}]=${x}`).join("&"),
+      ids.map(([m, x]) => `marketId=${m}&selectionId=${x}`).join("&"),
+    ].map((q) => base + q);
+    return { url: variants[0], alts: variants.slice(1), n: links.length };
   }
   const first = new URL(links[0]);
   const outcomes = links.map((u) => new URL(u).searchParams.get("outcomes")).filter(Boolean);
@@ -152,7 +156,8 @@ function placeButtons(legs) {
   if (!fd && !dk) return `<p class="note">No FanDuel/DraftKings bet-slip links for these legs yet (alternate and estimated lines usually don't have one). Reload the picks after props post, or add them in the app by hand.</p>`;
   const btn = (b, name) => b ? `<a class="btn ${name === "FanDuel" ? "primary" : ""} place-btn" href="${b.url}" target="_blank" rel="noopener">Place it on ${name}${b.n < legs.length ? ` (${b.n} of ${legs.length})` : ""} ↗</a>` : "";
   const missing = legs.filter((l) => !l.links?.fd).map((l) => l.player);
-  return `<div class="settings-actions place-row">${btn(fd, "FanDuel")}${btn(dk, "DraftKings")}</div>
+  const tries = fd && fd.n > 1 ? `<p class="note">Not all legs added? Try link <a href="${fd.alts[0]}" target="_blank" rel="noopener">B</a> or <a href="${fd.alts[1]}" target="_blank" rel="noopener">C</a> (clear FanDuel's bet slip first) and tell me which one works.</p>` : "";
+  return `<div class="settings-actions place-row">${btn(fd, "FanDuel")}${btn(dk, "DraftKings")}</div>${tries}
     ${missing.length && fd ? `<p class="note">Add by hand in FanDuel: ${missing.join(", ")}.</p>` : ""}
     <p class="note">If FanDuel says a selection wasn't added, one leg has closed or moved. Use FD↗ on each leg to add them one at a time.</p>`;
 }
@@ -166,7 +171,7 @@ function renderSlip() {
       <button class="leg-toggle" data-toggle-leg="${l.id}" aria-label="Include leg">${l.on ? "✓" : ""}</button>
       <div class="leg-main">
         <div><b>${l.player}</b> ${legText(l)}</div>
-        <small>${l.team} vs ${l.opp} · est ${l.est} · L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
+        <small>${l.team} vs ${l.opp} · ${l.est != null ? `est ${l.est} · ` : ""}L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
       </div>
       <span class="leg-odds">${l.odds}</span>
       ${l.on && l.links?.fd ? `<a class="leg-fd" href="${l.links.fd}" target="_blank" rel="noopener" aria-label="Open this leg in FanDuel">FD↗</a>` : ""}
