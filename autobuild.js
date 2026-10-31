@@ -256,7 +256,8 @@ const AUTO_MODES = {
 
 // 5 parlays from one prop type, best picks spread snake-style so #1 isn't the only good one.
 function buildStatParlays(cands, statKey, label) {
-  const pool = cands.filter((c) => c.statKey === statKey);
+  // Overs first: an under only fills a spot when no over is left.
+  const pool = cands.filter((c) => c.statKey === statKey).sort((a, b) => (a.side === "under") - (b.side === "under"));
   const parlays = [1, 2, 3, 4, 5].map((n) => ({ name: `${label} #${n}`, why: "", legs: [] }));
   const used = new Set();
   const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.goal;
