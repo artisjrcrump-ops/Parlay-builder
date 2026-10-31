@@ -189,6 +189,24 @@ async function getPlayerLines(game, playerName) {
 }
 
 // Settings sheet: paste the key once; it never leaves this device except to SportsGameOdds.
+// The version running = the ?v= on this script's URL (bumped every release).
+const APP_VERSION = (document.currentScript?.src.match(/[?&]v=(\d+)/) || [])[1] || "?";
+
+// Ask GitHub for the newest index.html and say whether this phone is behind.
+async function checkVersion() {
+  const el = $("app-version");
+  if (!el) return;
+  try {
+    const html = await fetch(`index.html?check=${Date.now()}`, { cache: "no-store" }).then((r) => r.text());
+    const latest = (html.match(/\.js\?v=(\d+)/) || [])[1];
+    el.innerHTML = !latest || latest === APP_VERSION
+      ? `Version ${APP_VERSION} · up to date ✓`
+      : `Version ${APP_VERSION} · <b>version ${latest} is out.</b> <a href="./?v=${latest}">Tap to update</a>`;
+  } catch {
+    el.textContent = `Version ${APP_VERSION}`;
+  }
+}
+
 function openSettings() {
   sheet.game = null;
   $("sheet-back").hidden = true;
@@ -205,8 +223,10 @@ function openSettings() {
       <p id="sgo-msg" class="note">${has ? "A key is saved on this device." : "No key saved yet."}
         The key is stored only on this phone, never in the app's code.
         Get a free one at <a href="https://sportsgameodds.com/pricing" target="_blank" rel="noopener">sportsgameodds.com</a>.</p>
+      <p id="app-version" class="note app-version">Version ${APP_VERSION} · checking for updates…</p>
     </div>`;
   openSheet();
+  checkVersion();
 }
 
 $("settings").addEventListener("click", openSettings);
