@@ -72,7 +72,9 @@ function estimatePrice(l, sd, line, side) {
 // The best line for one prop, or null. Considers FanDuel's posted line, its alternates and
 // YourWay-style lines in whole steps toward the estimate's safe side; picks the one with the
 // best value (chance x payout) among lines that clear the hit-chance and edge floors.
-function smartPick({ rows, statKey, est, l, mu, injury, yourWay = false }) {
+// bank: Bank builder legs instead: short prices (about -150 to -900), likeliest line wins,
+// as long as the app's chance is at least what the price implies.
+function smartPick({ rows, statKey, est, l, mu, injury, yourWay = false, bank = false }) {
   if (!Number.isFinite(l.line) || !Number.isFinite(est) || rows.length < 5) return null;
   if (/out|doubtful/i.test(injury || "")) return null;
   const mean = rows.reduce((t, r) => t + (r.stats[statKey] || 0), 0) / rows.length;
@@ -91,14 +93,14 @@ function smartPick({ rows, statKey, est, l, mu, injury, yourWay = false }) {
       // Lines FanDuel doesn't post only work as YourWay lines inside a same-game parlay.
       const odds = posted || alt || (yourWay && step > 0 ? estimatePrice(l, sd, line, side) : null);
       const dec = decimal(odds);
-      if (!dec || dec < 1.08) continue;
+      if (!dec || dec < 1.08 || (bank && dec > 1.67)) continue;
       let prob = sideProb(rows, statKey, est, sd, line, side) - (injury ? 0.05 : 0);
       if (mu?.tough && side === "under") prob += 0.02;
       if (mu?.soft && side === "over") prob += 0.02;
       prob = Math.min(prob, 0.9); // nothing in sports is a lock; stay humble
       const edge = prob - 1 / dec;
-      if (prob < SMART.minProb || edge < SMART.minEdge) continue;
-      const score = prob * dec;
+      if (bank ? prob < 0.7 || edge < 0 : prob < SMART.minProb || edge < SMART.minEdge) continue;
+      const score = bank ? prob + edge : prob * dec;
       // Same value (within 1%) -> take the likelier line.
       if (!best || score > best.score * 1.01 || (score > best.score * 0.99 && prob > best.prob)) {
         const h = hits(rows, statKey, side, line);
@@ -119,7 +121,7 @@ function smartPool(cands) {
   const perGame = {};
   const players = new Set();
   const pool = [];
-  for (const c of [...cands].filter((x) => x.smart).sort((a, b) => b.score - a.score)) {
+  for (const c of [...cands].filter((x) => x.smart && !x.bank).sort((a, b) => b.score - a.score)) {
     if (players.has(c.player) || (perGame[c.gameId] || 0) >= SMART.perGame) continue;
     players.add(c.player);
     perGame[c.gameId] = (perGame[c.gameId] || 0) + 1;

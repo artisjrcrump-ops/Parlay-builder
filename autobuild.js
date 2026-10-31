@@ -94,6 +94,18 @@ async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
         matchup: mu && (mu.tough || mu.soft) ? (mu.tough ? "tough matchup" : "soft matchup") : "",
       });
     }
+    // A short-priced version of this prop for the Bank builder (bank.js).
+    const safe = l.yes ? null : smartPick({ rows, statKey, est, l, mu, injury: p.injury, bank: true });
+    if (safe) {
+      out.push({
+        id: `${g.id}|${p.name}|${PROP_LABEL[key] || key}|${safe.side}|${safe.line}|bank`, smart: true, bank: true,
+        player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
+        stat: PROP_LABEL[key] || key, statKey: key, gradeKey: statKey, league: state.league, yes: false,
+        ...safe, est: Math.round(est * 10) / 10, postedLine: l.line,
+        oppDef: opp.def, oppN: opp.n, injury: p.injury || "", on: true,
+        matchup: mu && (mu.tough || mu.soft) ? (mu.tough ? "tough matchup" : "soft matchup") : "",
+      });
+    }
     for (const side of ["over", "under"]) {
       const odds = side === "over" ? l.over : l.under;
       const dec = decimal(odds);

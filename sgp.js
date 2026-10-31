@@ -101,7 +101,7 @@ async function runSgp(gameId) {
   try {
     const cands = withoutSaved(await sgpCandidates(g, status));
     // Posted lines plus YourWay lines; one leg per player and stat, so each prop uses whichever scores better.
-    renderParlays(buildSgps(g, cands), {
+    renderParlays(buildSgps(g, cands.filter((c) => !c.bank)), {
       header: skippedNote(cands),
       intro: "Each same-game parlay follows one game script so its legs help each other. Some legs use YourWay lines (a custom line FanDuel lets you set in same-game parlays); their prices are estimates until you set them in FanDuel. No pick appears in more than one.",
       outro: "FanDuel reprices same-game parlays for correlation, so the real payout will usually be lower than shown. These are model picks, not guarantees.",

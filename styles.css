@@ -492,3 +492,20 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .smart-leg small { display: block; color: var(--muted); font-size: 12px; }
 .smart-leg.off { opacity: 0.45; }
 .leg-toggle.on { background: var(--accent); color: #fff; }
+
+/* Bank builder ladder */
+.bank-setup { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; font-size: 14px; }
+.bank-setup .num { width: 64px; }
+.ladder { display: grid; gap: 6px; margin: 10px 0; }
+.rung {
+  display: grid;
+  grid-template-columns: 64px 20px 1fr;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 15px;
+}
+.rung.done { border-color: #22c55e; color: #22c55e; }
+.rung.now { background: #22c55e; border-color: #22c55e; color: #06210f; }

@@ -1,0 +1,166 @@
+// Bank builder: a ladder of 2-pick parlays. Start with a bank (say $50), bet all of it on
+// a 2-pick parlay that returns about 1.45x, roll the whole return into the next bet, and
+// reach the goal (say $1,000) in 8 wins. A loss restarts the ladder.
+// Shares globals from the other scripts (state, sheet, slip, $, decimal, american, money,
+// legText, reason, persist, openSheet, openSlip, loadPref, savePref, slateCandidates,
+// withoutSaved, skippedNote, LEAGUES).
+
+const LADDER_KEY = "pb.ladder";
+const LADDER_DEFAULT = { start: 50, goal: 1000, steps: 8, step: 1, bank: 50, last: null, done: false };
+
+function loadLadder() {
+  try { return { ...LADDER_DEFAULT, ...JSON.parse(localStorage.getItem(LADDER_KEY) || "{}") }; } catch { return { ...LADDER_DEFAULT }; }
+}
+
+function saveLadder(l) {
+  try { localStorage.setItem(LADDER_KEY, JSON.stringify(l)); } catch { /* storage blocked */ }
+}
+
+// Each rung returns the same multiple, so start x multiple^steps = goal.
+function ladderMultiple(l) {
+  return (l.goal / l.start) ** (1 / l.steps);
+}
+
+function rungs(l) {
+  const m = ladderMultiple(l);
+  return Array.from({ length: l.steps }, (_, i) => ({ n: i + 1, from: l.start * m ** i, to: l.start * m ** (i + 1) }));
+}
+
+// Best 2-pick parlays for this rung: picks from different games, together paying close to the
+// ladder multiple (a little over is fine), ranked by the chance both hit.
+function bankPairs(cands, multiple) {
+  const legs = cands.filter((c) => c.bank).sort((a, b) => b.prob - a.prob).slice(0, 80);
+  const pairs = [];
+  for (let i = 0; i < legs.length; i++) {
+    for (let j = i + 1; j < legs.length; j++) {
+      const a = legs[i];
+      const b = legs[j];
+      if (a.gameId === b.gameId || a.player === b.player) continue;
+      const dec = a.dec * b.dec;
+      pairs.push({ legs: [a, b], dec, prob: a.prob * b.prob, fits: dec >= multiple * 0.97 && dec <= multiple * 1.3 });
+    }
+  }
+  const fitting = pairs.filter((p) => p.fits).sort((x, y) => y.prob - x.prob);
+  // Nothing lands in range: fall back to the pairs closest to the multiple.
+  const pool = fitting.length ? fitting : pairs.sort((x, y) => Math.abs(x.dec - multiple) - Math.abs(y.dec - multiple));
+  const out = [];
+  const used = new Set();
+  for (const p of pool) {
+    if (p.legs.some((l) => used.has(l.player))) continue; // 3 different options, no shared players
+    p.legs.forEach((l) => used.add(l.player));
+    out.push(p);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+function ladderHtml(l) {
+  return `<div class="ladder">${rungs(l).reverse().map((r) => `
+    <div class="rung ${r.n < l.step || l.done ? "done" : r.n === l.step ? "now" : ""}">
+      <b>BET ${r.n}</b><span>⚡</span><b>${money(Math.round(r.from))} – ${money(Math.round(r.to))}</b>
+    </div>`).join("")}</div>`;
+}
+
+function renderBank(cands, note = "") {
+  const l = loadLadder();
+  const m = ladderMultiple(l);
+  const target = l.bank * m;
+  const pairs = cands ? bankPairs(cands, m) : [];
+  sheet.bankPairs = pairs;
+  $("sheet-body").innerHTML = `
+    <div class="bank-setup">
+      <label>Start $<input class="num" data-ladder="start" type="number" inputmode="decimal" min="1" value="${l.start}"></label>
+      <label>Goal $<input class="num" data-ladder="goal" type="number" inputmode="decimal" min="2" value="${l.goal}"></label>
+      <label>Bets <input class="num" data-ladder="steps" type="number" inputmode="numeric" min="2" max="15" value="${l.steps}"></label>
+    </div>
+    ${ladderHtml(l)}
+    <div class="slip-sum">
+      ${l.done ? `<div><b>🎉 Goal reached: ${money(l.bank)}</b>. Tap Restart to start a new ladder.</div>` : `<div><b>Bet ${l.step} of ${l.steps}</b> · bet <b>${money(l.bank)}</b> to get back about <b>${money(target)}</b></div>`}
+      <div class="muted">Each bet needs about ${american(m)} (${m.toFixed(2)}x back, stake included). 2 picks, different games.</div>
+      <div class="settings-actions">
+        ${l.done ? "" : `<button class="btn primary" data-ladder-won>✓ Won, next bet</button>`}
+        <button class="btn" data-ladder-lost>${l.done ? "Restart" : "✗ Lost, restart"}</button>
+      </div>
+    </div>
+    ${note}
+    ${cands == null || l.done ? "" : pairs.length ? pairs.map((p, i) => `
+      <div class="auto">
+        <div class="auto-head"><b>Option ${i + 1}</b><span class="${p.fits ? "in" : "out"}">${american(p.dec)} · ${money(l.bank)} → ${money(l.bank * p.dec)}</span></div>
+        <small class="auto-why">Both hit about ${Math.round(p.prob * 100)}% of the time${p.fits ? "" : " · pays less than this rung needs"}</small>
+        ${p.legs.map((c) => `
+          <div class="auto-leg">
+            <div><b>${c.player}</b> ${legText(c)} <span class="muted">${c.team} vs ${c.opp}</span><br>
+            <small>hits ~${Math.round(c.prob * 100)}% · ${reason(c)}</small></div>
+            <span class="leg-odds">${c.odds}</span>
+          </div>`).join("")}
+        <button class="btn primary" data-bank-use="${i}">Bet this (${money(l.bank)})</button>
+      </div>`).join("")
+    : `<p class="status">No 2-pick combos at these prices on this slate. Try another day or sport.</p>`}
+    <p class="note">One loss ends the run, so 8 straight wins is a long shot even with likely picks. Only bet the start amount you're OK losing.</p>`;
+}
+
+async function openBank() {
+  sheet.game = null;
+  $("sheet-back").hidden = true;
+  $("sheet-title").textContent = `🏦 Bank builder · ${LEAGUES[state.league].label}`;
+  openSheet();
+  renderBank(null, `<p class="status">Finding picks…</p>`);
+  if (!loadPref("sgoKey", "")) return renderBank(null, `<p class="status">Add your SportsGameOdds key in ⚙︎ Settings first.</p>`);
+  try {
+    const cands = withoutSaved(await slateCandidates((msg) => renderBank(null, `<p class="status">${msg}</p>`)));
+    sheet.bankCands = cands;
+    renderBank(cands, skippedNote(cands));
+  } catch (err) {
+    renderBank(null, `<p class="status">${/No upcoming/.test(err.message) ? "No upcoming games on this day. Change the day or sport on the main screen." : `Couldn't find picks (${err.message}).`}</p>`);
+  }
+}
+
+$("bank").addEventListener("click", openBank);
+
+$("sheet-body").addEventListener("click", (e) => {
+  const t = e.target.closest("button");
+  if (!t) return;
+  const d = t.dataset;
+  const l = loadLadder();
+  if (d.bankUse !== undefined) {
+    const p = sheet.bankPairs?.[+d.bankUse];
+    if (!p) return;
+    // The slip becomes this bet: both picks, staked with the whole bank.
+    slip.legs = p.legs.map((c) => {
+      const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season } = c;
+      return { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes: false, group: `Bank builder · bet ${l.step}`, on: true };
+    });
+    slip.stake = Math.round(l.bank * 100) / 100;
+    savePref("stake", String(slip.stake));
+    l.last = p.dec;
+    saveLadder(l);
+    persist();
+    return openSlip();
+  }
+  if (d.ladderWon !== undefined) {
+    l.bank = Math.round(l.bank * (l.last || ladderMultiple(l)) * 100) / 100;
+    if (l.step >= l.steps) l.done = true;
+    else l.step += 1;
+    l.last = null;
+  } else if (d.ladderLost !== undefined) {
+    Object.assign(l, { step: 1, bank: l.start, last: null, done: false });
+  } else {
+    return;
+  }
+  saveLadder(l);
+  renderBank(sheet.bankCands || null);
+});
+
+$("sheet-body").addEventListener("change", (e) => {
+  const field = e.target.dataset?.ladder;
+  if (!field) return;
+  const v = parseFloat(e.target.value);
+  if (!(v > 0)) return;
+  const l = loadLadder();
+  l[field] = field === "steps" ? Math.max(2, Math.min(15, Math.round(v))) : v;
+  if (l.goal <= l.start) l.goal = l.start * 2;
+  // Changing the plan restarts the ladder.
+  Object.assign(l, { step: 1, bank: l.start, last: null, done: false });
+  saveLadder(l);
+  renderBank(sheet.bankCands || null);
+});
