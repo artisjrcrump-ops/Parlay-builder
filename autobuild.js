@@ -11,13 +11,15 @@ const MIN_LEGS = 6; // Artis likes 6+ legs to pick from, then drops the ones he 
 // Legs allowed from one game: 2 normally, more when the slate is too small to reach MIN_LEGS.
 const perGameCap = (cands) => Math.max(MAX_PER_GAME, Math.ceil(MIN_LEGS / Math.max(1, new Set(cands.map((c) => c.gameId)).size)));
 
-// Build with fewer parlays until each one reaches MIN_LEGS (or only one is left).
+// Try 1..count parlays and keep the split that gives the most parlays with MIN_LEGS+ legs
+// (only those are shown). If none reach it, show the single biggest parlay.
 function atLeastMin(build, count) {
-  let best = [];
+  let best = null;
   for (let k = count; k >= 1; k--) {
     const out = build(k);
-    if (out.length && out.every((p) => p.legs.length >= MIN_LEGS)) return out;
-    if (!best.length || Math.min(...out.map((p) => p.legs.length)) > Math.min(...best.map((p) => p.legs.length))) best = out;
+    const good = out.filter((p) => p.legs.length >= MIN_LEGS);
+    if (!best || good.length > best.length) best = good;
+    if (k === 1 && !best.length) return out;
   }
   return best;
 }

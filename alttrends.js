@@ -73,7 +73,7 @@ function altSgps(cands) {
         combo.push(c);
         if (combo.length === 6) break; // up to 6 legs to pick from
       }
-      if (combo.length < 2) break;
+      if (combo.length < (k ? 4 : 2)) break; // a second combo only if it has 4+ legs
       combo.forEach((c) => used.add(c.id));
       out.push(combo);
     }
