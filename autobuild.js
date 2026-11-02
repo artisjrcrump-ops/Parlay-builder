@@ -6,6 +6,21 @@
 
 const MAX_LEGS = 10;
 const MAX_PER_GAME = 2;
+const MIN_LEGS = 6; // Artis likes 6+ legs to pick from, then drops the ones he doesn't want
+
+// Legs allowed from one game: 2 normally, more when the slate is too small to reach MIN_LEGS.
+const perGameCap = (cands) => Math.max(MAX_PER_GAME, Math.ceil(MIN_LEGS / Math.max(1, new Set(cands.map((c) => c.gameId)).size)));
+
+// Build with fewer parlays until each one reaches MIN_LEGS (or only one is left).
+function atLeastMin(build, count) {
+  let best = [];
+  for (let k = count; k >= 1; k--) {
+    const out = build(k);
+    if (out.length && out.every((p) => p.legs.length >= MIN_LEGS)) return out;
+    if (!best.length || Math.min(...out.map((p) => p.legs.length)) > Math.min(...best.map((p) => p.legs.length))) best = out;
+  }
+  return best;
+}
 // Artis wants overs: an under only makes the cut when it's clearly stronger, and ranks lower.
 const UNDER_BAR = { prob: 0.65, value: 0.06, rank: 0.08 };
 // At most one under in any parlay.
@@ -256,14 +271,19 @@ async function buildCandidates(progress) {
 }
 
 function buildParlays(cands) {
+  return atLeastMin((k) => buildThemed(cands, THEMES.slice(0, k)), THEMES.length);
+}
+
+function buildThemed(cands, themes) {
   const used = new Set(); // leg ids and player+stat keys already taken by any parlay
-  const parlays = THEMES.map((t) => ({ ...t, legs: [] }));
+  const parlays = themes.map((t) => ({ ...t, legs: [] }));
   const decOf = (p) => p.legs.reduce((d, l) => d * l.dec, 1);
-  const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * decOf(p) >= TARGET.goal;
+  const full = (p) => p.legs.length >= MAX_LEGS || (p.legs.length >= MIN_LEGS && slip.stake * decOf(p) >= TARGET.goal);
+  const cap = perGameCap(cands);
 
   const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`) && underOk(p, c)
     && !p.legs.some((l) => l.player === c.player)
-    && p.legs.filter((l) => l.gameId === c.gameId).length < MAX_PER_GAME;
+    && p.legs.filter((l) => l.gameId === c.gameId).length < cap;
 
   // Round-robin, one leg per parlay per pass, so no theme hogs the best picks.
   let progress = true;
@@ -341,14 +361,19 @@ const AUTO_MODES = {
 
 // 5 parlays from one prop type, best picks spread snake-style so #1 isn't the only good one.
 function buildStatParlays(cands, statKey, label, fit = (c) => c.statKey === statKey) {
+  return atLeastMin((k) => buildStatN(cands, label, fit, k), 5);
+}
+
+function buildStatN(cands, label, fit, count) {
   // Overs first: an under only fills a spot when no over is left.
   const pool = cands.filter(fit).sort((a, b) => (a.side === "under") - (b.side === "under"));
-  const parlays = [1, 2, 3, 4, 5].map((n) => ({ name: `${label} #${n}`, why: "", legs: [] }));
+  const parlays = Array.from({ length: count }, (_, i) => ({ name: `${label} #${i + 1}`, why: "", legs: [] }));
   const used = new Set();
-  const full = (p) => p.legs.length >= MAX_LEGS || slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.goal;
+  const cap = perGameCap(pool);
+  const full = (p) => p.legs.length >= MAX_LEGS || (p.legs.length >= MIN_LEGS && slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.goal);
   const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`) && underOk(p, c)
     && !p.legs.some((l) => l.player === c.player)
-    && p.legs.filter((l) => l.gameId === c.gameId).length < MAX_PER_GAME;
+    && p.legs.filter((l) => l.gameId === c.gameId).length < cap;
   let round = 0;
   let progress = true;
   while (progress) {

@@ -2,7 +2,7 @@
 // (shootout, favorite rolls, underdog hangs around, grind, value), with no shared picks.
 // Shares globals from the other scripts.
 
-const SGP_MAX_LEGS = 5;
+const SGP_MAX_LEGS = 8;
 
 // Which side the spread favors, from ESPN's "CHA -1.5" style detail.
 function favoriteSide(g) {
@@ -34,10 +34,15 @@ function sgpThemes(g) {
 }
 
 function buildSgps(g, cands) {
+  const themes = sgpThemes(g);
+  return atLeastMin((k) => buildSgpN(cands, themes.slice(0, k)), themes.length);
+}
+
+function buildSgpN(cands, themes) {
   const used = new Set();
-  const parlays = sgpThemes(g).map((t) => ({ ...t, legs: [] }));
+  const parlays = themes.map((t) => ({ ...t, legs: [] }));
   const full = (p) => p.legs.length >= SGP_MAX_LEGS
-    || (p.legs.length >= 3 && slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.low);
+    || (p.legs.length >= MIN_LEGS && slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.goal);
   const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`) && !p.legs.some((l) => l.player === c.player) && underOk(p, c);
 
   let progress = true;

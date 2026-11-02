@@ -57,7 +57,7 @@ function altTrend(args) {
 
 const pct = (h, n) => `${Math.round(rate(h, n) * 100)}%`;
 
-// Same-game combos: 2-3 legs from different players, best signals first, no repeats.
+// Same-game combos: up to 6 legs from different players, best signals first, no repeats.
 function altSgps(cands) {
   const byGame = {};
   cands.filter((c) => c.alt).forEach((c) => (byGame[c.gameId] ||= []).push(c));
@@ -71,7 +71,7 @@ function altSgps(cands) {
       for (const c of pool) {
         if (used.has(c.id) || combo.some((x) => x.player === c.player)) continue;
         combo.push(c);
-        if (combo.length === 3) break;
+        if (combo.length === 6) break; // up to 6 legs to pick from
       }
       if (combo.length < 2) break;
       combo.forEach((c) => used.add(c.id));
