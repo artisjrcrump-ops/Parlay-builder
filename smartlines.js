@@ -132,12 +132,10 @@ function smartPick({ rows, statKey, est, l, mu, injury, yourWay = false, bank = 
 
 function smartPool(cands) {
   const perGame = {};
-  const players = new Set();
   const pool = [];
   for (const c of [...cands].filter((x) => x.smart && !x.bank && !x.alt).sort((a, b) => b.score - a.score)) {
-    if (players.has(c.player) || (perGame[c.gameId] || 0) >= SMART.perGame) continue;
+    if (!playerOk(pool, c) || (perGame[c.gameId] || 0) >= SMART.perGame) continue;
     if (c.side === "under" && pool.filter((x) => x.side === "under").length >= 3) continue; // overs first
-    players.add(c.player);
     perGame[c.gameId] = (perGame[c.gameId] || 0) + 1;
     pool.push(c);
     if (pool.length >= SMART.poolSize) break;

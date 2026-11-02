@@ -69,7 +69,7 @@ function altSgps(cands) {
     for (let k = 0; k < 2; k++) { // up to 2 combos per game
       const combo = [];
       for (const c of pool) {
-        if (used.has(c.id) || combo.some((x) => x.player === c.player)) continue;
+        if (used.has(c.id) || !playerOk(combo, c)) continue;
         combo.push(c);
         if (combo.length === 6) break; // up to 6 legs to pick from
       }
@@ -151,7 +151,7 @@ function altPlusTickets(cands) {
       if (legs >= MIN_LEGS && pay >= TARGET.goal) break;
       const block = [];
       for (const c of g) {
-        if (used.has(c.id) || block.some((x) => x.player === c.player)) continue;
+        if (used.has(c.id) || !playerOk(block, c)) continue;
         block.push(c);
         if (block.length === PLUS_BLOCK || legs + block.length >= PLUS_MAX_LEGS) break;
       }

@@ -6,7 +6,23 @@
 
 const MAX_LEGS = 10;
 const MAX_PER_GAME = 2;
-const MIN_LEGS = 6; // Artis likes 6+ legs to pick from, then drops the ones he doesn't want
+const MIN_LEGS = 6;
+
+// Up to 2 legs per player when they make sense together: both overs, and stats that don't
+// overlap (Points + Rebounds is fine; Points + PRA or Rush Yds + Rush+Rec Yds is not).
+const STAT_PARTS = {
+  pra: ["points", "totalRebounds", "assists"], pr: ["points", "totalRebounds"], pa: ["points", "assists"],
+  ra: ["totalRebounds", "assists"], rushRec: ["rushingYards", "receivingYards"],
+};
+const statParts = (k) => STAT_PARTS[k] || [k];
+function playerOk(legs, c) {
+  const mine = legs.filter((l) => l.player === c.player);
+  if (!mine.length) return true;
+  if (mine.length >= 2) return false;
+  const over = (l) => l.side === "over" || l.yes;
+  const l = mine[0];
+  return over(l) && over(c) && !statParts(l.statKey).some((x) => statParts(c.statKey).includes(x));
+} // Artis likes 6+ legs to pick from, then drops the ones he doesn't want
 
 // Legs allowed from one game: 2 normally, more when the slate is too small to reach MIN_LEGS.
 const perGameCap = (cands) => Math.max(MAX_PER_GAME, Math.ceil(MIN_LEGS / Math.max(1, new Set(cands.map((c) => c.gameId)).size)));
@@ -288,7 +304,7 @@ function buildThemed(cands, themes) {
   const cap = perGameCap(cands);
 
   const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`) && underOk(p, c)
-    && !p.legs.some((l) => l.player === c.player)
+    && playerOk(p.legs, c)
     && p.legs.filter((l) => l.gameId === c.gameId).length < cap;
 
   // Round-robin, one leg per parlay per pass, so no theme hogs the best picks.
@@ -378,7 +394,7 @@ function buildStatN(cands, label, fit, count) {
   const cap = perGameCap(pool);
   const full = (p) => p.legs.length >= MAX_LEGS || (p.legs.length >= MIN_LEGS && slip.stake * p.legs.reduce((d, l) => d * l.dec, 1) >= TARGET.goal);
   const canAdd = (p, c) => !used.has(c.id) && !used.has(`${c.player}|${c.stat}`) && underOk(p, c)
-    && !p.legs.some((l) => l.player === c.player)
+    && playerOk(p.legs, c)
     && p.legs.filter((l) => l.gameId === c.gameId).length < cap;
   let round = 0;
   let progress = true;
