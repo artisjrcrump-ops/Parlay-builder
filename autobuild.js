@@ -162,15 +162,19 @@ async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
       });
     }
     // FanDuel "X+" alternate line this player keeps clearing (alttrends.js).
-    const at = l.yes ? null : altTrend({ rows, statKey, l, opp: opp.abbr, home: p.side === "home" });
+    const at = l.yes || mu?.tough ? null : altTrend({ rows, statKey, l, opp: opp.abbr, home: p.side === "home" });
     if (at) {
+      // How likely vs what the price implies, nudged up against a soft defense (Top 10 ranks on this).
+      const oppDefPct = opp.def && opp.n ? opp.def / opp.n : 0.5;
+      const aProb = Math.min(0.97, at.all / at.n * 0.6 + at.l5 / at.l5n * 0.4 + (mu?.soft ? 0.03 : 0) + (oppDefPct - 0.5) * 0.06);
       out.push({
         id: `${g.id}|${p.name}|${PROP_LABEL[key] || key}|over|alt${at.thr}`, alt: true, smart: true,
         player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
         away: g.away.abbr, home: g.home.abbr,
         stat: PROP_LABEL[key] || key, statKey: key, gradeKey: statKey, league: state.league, yes: false,
         side: "over", line: at.line, thr: at.thr, odds: at.odds, dec: at.dec, source: at.source, priceSource: at.source,
-        prob: at.all / at.n, value: 0, est: Math.round(est * 10) / 10,
+        prob: aProb, value: aProb - 1 / at.dec, est: Math.round(est * 10) / 10, l5Rate: at.l5 / at.l5n,
+        oppDef: opp.def, oppN: opp.n, matchup: mu?.soft ? "soft matchup" : "",
         l5Hits: at.l5, l5n: at.l5n, allHits: at.all, n: at.n, vsHits: at.vs, vsn: at.vsn, haHits: at.ha, han: at.han,
         l5: `${at.l5}/${at.l5n}`, season: `${at.all}/${at.n}`, on: true,
       });

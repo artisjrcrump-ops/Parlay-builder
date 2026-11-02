@@ -154,8 +154,8 @@ $("sheet-body").addEventListener("click", (e) => {
   const at = slip.legs.findIndex((x) => x.id === c.id);
   if (at >= 0) slip.legs.splice(at, 1);
   else {
-    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, l5, season } = c;
-    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est: null, l5, season, yes: false, group: "Cheatsheet", on: true });
+    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, l5, season, thr } = c;
+    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est: null, l5, season, thr, yes: false, group: "Cheatsheet", on: true });
   }
   persist();
   renderCheats(sheet.cheats);

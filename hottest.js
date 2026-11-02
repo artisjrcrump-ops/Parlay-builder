@@ -36,13 +36,13 @@ function renderHottest(picks, note = sheet.hotNote || "") {
       <button class="btn primary" data-hot-add="all">Add all ${picks.length} to slip</button>
       <button class="btn" data-open-slip>Open slip</button>
     </div>
-    <p class="note">Ranked by recent form (how often they cleared this line in the last 5), season hit rate, the estimate vs FanDuel's line, and how tonight's opponent defends that stat. One pick per player.</p>
+    <p class="note">Includes "X+" alternate lines (🪜) when a player keeps clearing a lower line, priced like the alt lines worth playing. Ranked by recent form (how often they cleared this line in the last 5), season hit rate, the estimate vs FanDuel's line, and how tonight's opponent defends that stat. One pick per player.</p>
     <div class="auto">
       ${picks.map((l, i) => `
         <div class="auto-leg">
-          <div><b>${i + 1}. ${l.player}</b> ${legText(l)} <span class="muted">${l.team} vs ${l.opp}</span><br>
+          <div><b>${i + 1}. ${l.player}</b> ${l.alt ? "🪜 " : ""}${legText(l)} <span class="muted">${l.team} vs ${l.opp}</span><br>
           <small>${reason(l)}</small></div>
-          <button class="pick hot-pick ${inSlip(l) ? "added" : ""}" data-hot-add="${i}">${l.odds}<br><small>${inSlip(l) ? "Added" : "Add"}</small></button>
+          <button class="pick hot-pick ${inSlip(l) ? "added" : ""}" data-hot-add="${i}">${l.source === "estimated" ? "~" : ""}${l.odds}<br><small>${inSlip(l) ? "Added" : "Add"}</small></button>
         </div>`).join("")}
     </div>
     <p class="note">Picks from a simple model, not guarantees.</p>`
@@ -68,7 +68,8 @@ async function openHottest() {
       raw = await slateCandidates(status);
     }
     const cands = withoutSaved(raw);
-    renderHottest(hottestPicks(postedOnly(cands)), skippedNote(cands));
+    // FanDuel's main lines plus "X+" alt lines the player keeps clearing (e.g. 60+ rush yds at -350).
+    renderHottest(hottestPicks(cands.filter((c) => !c.smart || c.alt)), skippedNote(cands));
   } catch (err) {
     status(/No upcoming/.test(err.message)
       ? `No upcoming ${hotSport() === "all" ? "" : `${LEAGUES[state.league].label} `}games on this day. Use ‹ › on the main screen to change the day.`
@@ -102,8 +103,8 @@ $("sheet-body").addEventListener("click", (e) => {
       if (which !== "all") slip.legs.splice(i, 1); // tap again to take it back out
       continue;
     }
-    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes } = l;
-    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes, group: "Hottest 10", on: true });
+    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes, thr } = l;
+    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes, thr, group: "Hottest 10", on: true });
   }
   persist();
   renderHottest(sheet.hotPicks);

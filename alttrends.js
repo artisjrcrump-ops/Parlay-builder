@@ -119,8 +119,8 @@ $("sheet-body").addEventListener("click", (e) => {
   if (!b || !sheet.altCombos) return;
   for (const c of sheet.altCombos[+b.dataset.altUse] || []) {
     if (slip.legs.some((x) => x.id === c.id)) continue;
-    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season } = c;
-    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes: false, group: "Alt lines SGP", on: true });
+    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, thr } = c;
+    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, thr, yes: false, group: "Alt lines SGP", on: true });
   }
   persist();
   b.textContent = "Added ✓";
@@ -193,8 +193,8 @@ $("sheet-body").addEventListener("click", (e) => {
   const t = sheet.altPlus[+b.dataset.plusUse];
   for (const c of (t?.blocks || []).flat()) {
     if (slip.legs.some((x) => x.id === c.id)) continue;
-    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, l5, season } = c;
-    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est: null, l5, season, yes: false, group: `SGP+ #${+b.dataset.plusUse + 1}`, on: true });
+    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, l5, season, thr } = c;
+    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est: null, l5, season, thr, yes: false, group: `SGP+ #${+b.dataset.plusUse + 1}`, on: true });
   }
   persist();
   b.textContent = "Added ✓";

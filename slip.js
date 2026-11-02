@@ -99,6 +99,7 @@ function toggleCandidate(id, btn) {
 
 function legText(l) {
   if (l.yes || (/TD/.test(l.stat) && !/Pass|Rush|Rec/.test(l.stat))) return l.stat; // "Anytime TD", "Double-double"
+  if (l.thr) return `${l.thr}+ ${l.stat}`; // alternate "X+" line
   return `${l.side === "over" ? "Over" : "Under"} ${l.line} ${l.stat}`;
 }
 
