@@ -543,3 +543,4 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .leg-fd { font-size: 11px; font-weight: 700; color: #1493ff; text-decoration: none; padding: 4px; white-space: nowrap; }
 .app-version { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line); }
 .copy-name { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: 700; cursor: pointer; text-align: left; }
+.plus-block { border-left: 3px solid var(--line); padding: 4px 0 4px 10px; margin: 8px 0; }

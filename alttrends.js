@@ -126,3 +126,77 @@ $("sheet-body").addEventListener("click", (e) => {
   b.textContent = "Added ✓";
   b.classList.remove("primary");
 });
+
+// SGP+ like Artis's own tickets: one multi-game parlay made of same-game blocks of alt lines
+// (2-5 legs per game, a single leg when a game only has one), until it pays about $1,000.
+const PLUS_TICKETS = 3;
+const PLUS_MAX_LEGS = 15;
+const PLUS_BLOCK = 5;
+const altScore = (c) => rate(c.l5Hits, c.l5n) * 2 + rate(c.allHits, c.n) + (c.vsn ? rate(c.vsHits, c.vsn) * 0.5 : 0);
+
+function altPlusTickets(cands) {
+  const byGame = {};
+  cands.filter((c) => c.alt).forEach((c) => (byGame[c.gameId] ||= []).push(c));
+  const games = Object.values(byGame).map((legs) => legs.sort((a, b) => altScore(b) - altScore(a)))
+    .sort((a, b) => altScore(b[0]) - altScore(a[0]));
+  const used = new Set();
+  const tickets = [];
+  for (let t = 0; t < PLUS_TICKETS && games.length; t++) {
+    const order = games.slice(t % games.length).concat(games.slice(0, t % games.length)); // each ticket leads with a different game
+    const blocks = [];
+    let dec = 1;
+    let legs = 0;
+    for (const g of order) {
+      const pay = slip.stake * dec;
+      if (legs >= MIN_LEGS && pay >= TARGET.goal) break;
+      const block = [];
+      for (const c of g) {
+        if (used.has(c.id) || block.some((x) => x.player === c.player)) continue;
+        block.push(c);
+        if (block.length === PLUS_BLOCK || legs + block.length >= PLUS_MAX_LEGS) break;
+      }
+      if (!block.length) continue;
+      block.forEach((c) => { used.add(c.id); dec *= c.dec; });
+      legs += block.length;
+      blocks.push(block);
+      if (legs >= PLUS_MAX_LEGS) break;
+    }
+    if (legs >= 2) tickets.push({ blocks, dec, legs });
+  }
+  return tickets;
+}
+
+function renderAltPlus(header, cands) {
+  const tickets = altPlusTickets(cands);
+  sheet.altPlus = tickets;
+  sheet.autoParlays = null;
+  const leg = (c) => `<div class="alt-leg"><b>${c.player}</b> ${c.thr}+ ${c.stat} <span class="leg-odds">${c.source === "estimated" ? "~" : ""}${c.odds}</span>
+    <small class="muted"> · L5 ${c.l5Hits}/${c.l5n} · season ${c.allHits}/${c.n}</small></div>`;
+  $("sheet-body").innerHTML = `${header}
+    <p class="note">Built like your own tickets: same-game blocks of alternate "X+" lines from several games in one parlay (FanDuel's SGP+). Every leg cleared its line in 4+ of the last 5 games. FanDuel reprices each same-game block, so the real payout will be lower than the straight math shown. Prices with ~ are estimates.</p>
+    ${tickets.length ? tickets.map((t, i) => `
+      <div class="auto">
+        <div class="auto-head"><b>SGP+ #${i + 1} · ${t.blocks.length} game${t.blocks.length === 1 ? "" : "s"} · ${t.legs} legs</b>
+          <span class="muted">~${american(t.dec)} · ${money(slip.stake)} → ~${money(slip.stake * t.dec)}</span></div>
+        ${t.blocks.map((b) => `
+          <div class="plus-block">
+            <div class="muted"><small>${b.length > 1 ? "SGP · " : ""}${b[0].sport ? `${b[0].sport} · ` : ""}${b[0].away} @ ${b[0].home}</small></div>
+            ${b.map(leg).join("")}
+          </div>`).join("")}
+        <button class="btn primary" data-plus-use="${i}">Add to slip</button>
+      </div>`).join("") : `<p class="status">Not enough alternate-line picks on this slate yet. Props often post closer to game time.</p>`}`;
+}
+
+$("sheet-body").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-plus-use]");
+  if (!b || !sheet.altPlus) return;
+  const t = sheet.altPlus[+b.dataset.plusUse];
+  for (const c of (t?.blocks || []).flat()) {
+    if (slip.legs.some((x) => x.id === c.id)) continue;
+    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, l5, season } = c;
+    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est: null, l5, season, yes: false, group: `SGP+ #${+b.dataset.plusUse + 1}`, on: true });
+  }
+  persist();
+  b.textContent = "Added ✓";
+  b.classList.remove("primary");
+});

@@ -352,11 +352,11 @@ function renderParlays(parlays, opts = {}) {
 
 const AUTO_MODES = {
   basketball: [
-    ["smart", "Best lines pool"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
+    ["smart", "Best lines pool"], ["altplus", "Alt-line SGP+ (multi-game)"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
     ["assists", "Assists"], ["points", "Points"], ["pra", "Pts + Reb + Ast"],
   ],
   football: [
-    ["smart", "Best lines pool"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
+    ["smart", "Best lines pool"], ["altplus", "Alt-line SGP+ (multi-game)"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
     ["rushingYards", "Rushing yards"], ["receivingYards", "Receiving yards"], ["receptions", "Receptions"],
   ],
 };
@@ -419,6 +419,7 @@ function renderAuto() {
   sheet.smart = null;
   if (mode === "smart") return renderSmart(header, all);
   if (mode === "alt") return renderAltTrends(header, all);
+  if (mode === "altplus") return renderAltPlus(header, all);
   const cands = postedOnly(all);
   const parlays = mode === "mixed" ? buildParlays(cands)
     : mode === "blowout" ? buildStatParlays(cands, null, "Blowout bench", (c) => c.bench && (c.side === "over" || c.yes))
