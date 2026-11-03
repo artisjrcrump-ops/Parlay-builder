@@ -107,6 +107,8 @@ function renderBank(cands, note = "") {
     ${ladderHtml(l, pairs)}
     <div class="slip-sum">
       ${l.done ? `<div><b>🎉 Goal reached: ${money(l.bank)}</b>. Tap Restart to start a new ladder.</div>` : `<div><b>Bet ${l.step} of ${l.steps}</b> · bet <b>${money(l.bank)}</b> to get back about <b>${money(target)}</b></div>`}
+      ${l.done ? "" : `<label class="bank-now">Your bank now $<input class="num" data-bank-now type="number" inputmode="decimal" min="1" step="0.01" value="${l.bank}"></label>
+      <div class="muted">${l.step > 1 ? "Set this to what FanDuel actually paid on your last bet if it's different. " : ""}The app assumes you won what your picks' odds pay, which can beat the ladder's plan.</div>`}
       <div class="muted">Each bet needs about ${american(m)} (${m.toFixed(2)}x back, stake included). 2 picks, different games.</div>
       <div class="settings-actions">
         ${l.done ? "" : `<button class="btn primary" data-ladder-won>✓ Won, next bet</button>`}
@@ -197,6 +199,14 @@ $("sheet-body").addEventListener("click", (e) => {
 });
 
 $("sheet-body").addEventListener("change", (e) => {
+  if (e.target.dataset?.bankNow !== undefined) {
+    const v = parseFloat(e.target.value);
+    if (!(v > 0)) return;
+    const l = loadLadder();
+    l.bank = Math.round(v * 100) / 100; // just the bank; the plan and progress stay
+    saveLadder(l);
+    return renderBank(sheet.bankCands || null, sheet.bankNote || "");
+  }
   const field = e.target.dataset?.ladder;
   if (!field) return;
   const v = parseFloat(e.target.value);
