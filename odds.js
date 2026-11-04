@@ -95,7 +95,7 @@ function oddsErrorNote() {
   const limit = /limit|quota|exceed|429|rate/i.test(oddsError.msg);
   return `<p class="warn">FanDuel lines didn't load for ${oddsError.league}: "${oddsError.msg}".${limit
     ? " That usually means the free SportsGameOdds key hit its monthly limit; it resets next month, or check your usage at sportsgameodds.com."
-    : " Try again in a few minutes."}</p>`;
+    : /key/i.test(oddsError.msg) ? " Check your key in ⚙︎ Settings." : " Try again in a few minutes."}</p>`;
 }
 
 // One request per league per day, cached, to stay inside the free monthly allowance.
