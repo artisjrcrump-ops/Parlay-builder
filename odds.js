@@ -3,7 +3,7 @@
 
 const SGO = "https://api.sportsgameodds.com/v2/events";
 const SGO_LEAGUE = { nba: "NBA", ncaab: "NCAAB", nfl: "NFL", ncaaf: "NCAAF" };
-const CACHE_MINUTES = 10; // the free plan refreshes odds every 10 minutes
+const CACHE_MINUTES = 30; // the free plan has a monthly limit, so refetch at most every 30 minutes
 
 // App stat key -> SportsGameOdds statID.
 const PROP_STATS = {
@@ -87,6 +87,17 @@ function betLinksFor(leg) {
   return hit || dkGame ? { fd: hit?.fd || null, dk: hit?.dk || null, dkGame, src: hit?.src || "", n: list.length } : null;
 }
 
+const ODDS_FAIL = {};
+let oddsError = null; // last SportsGameOdds failure, shown above picks (sportChips)
+
+function oddsErrorNote() {
+  if (!oddsError || Date.now() - oddsError.at > 30 * 60 * 1000) return "";
+  const limit = /limit|quota|exceed|429|rate/i.test(oddsError.msg);
+  return `<p class="warn">FanDuel lines didn't load for ${oddsError.league}: "${oddsError.msg}".${limit
+    ? " That usually means the free SportsGameOdds key hit its monthly limit; it resets next month, or check your usage at sportsgameodds.com."
+    : " Try again in a few minutes."}</p>`;
+}
+
 // One request per league per day, cached, to stay inside the free monthly allowance.
 async function loadOddsEvents(game) {
   const key = oddsKey();
@@ -104,9 +115,24 @@ async function loadOddsEvents(game) {
   const url = `${SGO}?leagueID=${league}&bookmakerID=fanduel,draftkings&startsAfter=${start.toISOString()}`
     + `&startsBefore=${end.toISOString()}&limit=100&apiKey=${encodeURIComponent(key)}`
     + "&includeAltLines=true"; // alternate lines price the app's suggested lines (and 2+ TDs)
-  const res = await fetch(url);
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || body.success === false) throw new Error(body.error || `HTTP ${res.status}`);
+  // After a failure, don't ask again for 5 minutes (every player would otherwise retry it).
+  const failed = ODDS_FAIL[cacheKey];
+  if (failed && Date.now() - failed.at < 5 * 60 * 1000) throw new Error(failed.msg);
+  let res, body;
+  try {
+    res = await fetch(url);
+    body = await res.json().catch(() => ({}));
+  } catch (err) {
+    res = { ok: false, status: 0 };
+    body = { error: "Couldn't reach SportsGameOdds" };
+  }
+  if (!res.ok || body.success === false) {
+    const msg = body.error || body.message || `HTTP ${res.status}`;
+    ODDS_FAIL[cacheKey] = { at: Date.now(), msg };
+    oddsError = { league, msg, at: Date.now() };
+    throw new Error(msg);
+  }
+  if (oddsError?.league === league) oddsError = null;
 
   // Keep only what the app needs so the cache stays small.
   const events = (body.data || []).map((ev) => ({

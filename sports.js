@@ -15,7 +15,7 @@ function sportsOn() {
 function sportChips() {
   const on = sportsOn();
   return `<div class="chips">${Object.entries(LEAGUES).map(([k, lg]) =>
-    `<button class="chip ${on.includes(k) ? "on" : ""}" data-sport="${k}">${lg.label}</button>`).join("")}</div>`;
+    `<button class="chip ${on.includes(k) ? "on" : ""}" data-sport="${k}">${lg.label}</button>`).join("")}</div>${typeof oddsErrorNote === "function" ? oddsErrorNote() : ""}`;
 }
 
 // Score one league's slate for the board's day. The scoring code reads state.league and
