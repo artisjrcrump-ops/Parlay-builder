@@ -191,8 +191,8 @@ async function getPlayerLines(game, playerName, playerId) {
   // Settings, or when DraftKings has nothing for this player (e.g. some college games).
   const fdFirst = loadPref("lines", "dk") === "fd";
   if (!fdFirst) {
-    const dk = await espnPlayerLines(game, playerId).catch(() => ({}));
-    if (Object.keys(dk).length || !oddsKey()) { LINE_SOURCE = "DraftKings"; return dk; }
+    const all = await espnGameLines(game).catch(() => ({}));
+    if (Object.keys(all).length || !oddsKey()) { LINE_SOURCE = "DraftKings"; return all[playerId] || {}; }
   }
   let events = null;
   if (oddsKey()) {
@@ -273,7 +273,7 @@ function openSettings() {
           <option value="dk" ${loadPref("lines", "dk") === "dk" ? "selected" : ""}>DraftKings (free, no limit)</option>
           <option value="fd" ${loadPref("lines", "dk") === "fd" ? "selected" : ""}>FanDuel (uses your key's monthly limit)</option>
         </select></label>
-      <p class="note">With DraftKings picked, your key is only used for games DraftKings has no props for.</p>
+      <p class="note">With DraftKings picked, your key is only used for games DraftKings has no props for at all.</p>
       <p id="app-version" class="note app-version">Version ${APP_VERSION} · checking for updates…</p>
     </div>`;
   openSheet();
