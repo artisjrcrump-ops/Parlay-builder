@@ -56,7 +56,6 @@ async function openHottest() {
   sheet.reopen = openHottest;
   openSheet();
   const status = (msg) => { $("sheet-body").innerHTML = `${hotHeader()}<p class="status">${msg}</p>`; };
-  if (!loadPref("sgoKey", "")) return status("Add your SportsGameOdds key in ⚙︎ Settings first. Hottest picks need FanDuel's lines.");
   try {
     let raw;
     if (hotSport() === "all") {

@@ -151,7 +151,7 @@ function stakeLabel() {
 // yourWay: also allow custom lines FanDuel doesn't post (same-game parlays only).
 async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
   if (/out|doubtful/i.test(p.injury || "")) return [];
-  const lines = await getPlayerLines(g, p.name);
+  const lines = await getPlayerLines(g, p.name, p.id);
   if (!lines || !Object.keys(lines).length) return [];
   const { rows, season } = await loadGameLog(p.id);
   if (rows.length < 3) return [];
@@ -486,7 +486,6 @@ async function openAutoParlays() {
   $("sheet-title").textContent = "⚡ Auto parlays";
   openSheet();
   const status = (msg) => { $("sheet-body").innerHTML = `${sportChips()}<p class="status">${msg}</p>`; };
-  if (!loadPref("sgoKey", "")) return status("Add your SportsGameOdds key in ⚙︎ Settings first. Auto parlays need FanDuel's lines.");
   status("Finding picks…");
   // Every sport that's on, scored once per day (10 min); switching prop types reuses it.
   const r = await sportsCandidates(status);

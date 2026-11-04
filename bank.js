@@ -141,7 +141,6 @@ async function openBank() {
   const status = (msg) => renderBank(null, `${sportChips()}<p class="status">${msg}</p>`);
   sheet.reopen = openBank;
   status("Finding picks…");
-  if (!loadPref("sgoKey", "")) return status("Add your SportsGameOdds key in ⚙︎ Settings first.");
   const r = await sportsCandidates(status);
   if (!r) return; // reopened or sports changed meanwhile
   const { all, games, failed } = r;

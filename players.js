@@ -269,14 +269,14 @@ async function openPlayer(playerId) {
     let lines = null;
     let linesError = "";
     try {
-      lines = await getPlayerLines(g, p.name);
+      lines = await getPlayerLines(g, p.name, p.id);
     } catch (err) {
       linesError = err.message;
     }
     if (sheet.game !== g) return;
     const estimate = (key) => (0.6 * avg(last5, key) + 0.4 * avg(rows, key)) * factor;
     const fdRow = lines ? `
-      <tr class="fd"><td>FanDuel<br><small>line</small></td>${stats.map((s) => {
+      <tr class="fd"><td>${LINE_SOURCE}<br><small>line</small></td>${stats.map((s) => {
         if (s.key === "tds") {
           const a = lines.anytimeTd;
           const t = lines.twoTd;

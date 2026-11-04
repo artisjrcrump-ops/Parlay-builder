@@ -98,10 +98,6 @@ async function runSgp(gameId) {
   $("sheet-back").hidden = true;
   $("sheet-title").textContent = `SGPs · ${g.away.abbr} @ ${g.home.abbr}`;
   openSheet();
-  if (!loadPref("sgoKey", "")) {
-    $("sheet-body").innerHTML = `<p class="status">Add your SportsGameOdds key in ⚙︎ Settings first. SGPs need FanDuel's lines.</p>`;
-    return;
-  }
   const status = (msg) => { $("sheet-body").innerHTML = `<p class="status">${msg}</p>`; };
   try {
     const cands = withoutSaved(await sgpCandidates(g, status));

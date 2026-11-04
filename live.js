@@ -104,7 +104,7 @@ async function liveLeague(key, progress) {
       const box = liveBox(summary);
       const picks = [];
       for (const [id, p] of Object.entries(box)) {
-        const lines = await getPlayerLines(g, p.name).catch(() => null);
+        const lines = await getPlayerLines(g, p.name, p.id).catch(() => null);
         if (!lines) continue;
         const role = blowout ? (p.starter ? "starter" : "bench") : null;
         for (const statKey of LIVE_STATS[sportOf(key)]) {
@@ -199,7 +199,6 @@ async function openLive() {
   $("sheet-title").textContent = "⏱ 2nd-half parlays";
   openSheet();
   const status = (msg) => { $("sheet-body").innerHTML = `${sportChips()}<p class="status">${msg}</p>`; };
-  if (!loadPref("sgoKey", "")) return status("Add your SportsGameOdds key in ⚙︎ Settings first. Live picks need FanDuel's lines.");
   status("Reading live games…");
   const token = (sheet.liveToken = (sheet.liveToken || 0) + 1);
   const games = [];

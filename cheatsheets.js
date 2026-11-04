@@ -131,7 +131,6 @@ async function openCheats() {
   sheet.reopen = openCheats;
   openSheet();
   const status = (msg) => { $("sheet-body").innerHTML = `${sportChips()}<p class="status">${msg}</p>`; };
-  if (!loadPref("sgoKey", "")) return status("Add your SportsGameOdds key in ⚙︎ Settings first. Cheatsheets need FanDuel's lines.");
   try {
     const r = await sportsCandidates(status);
     if (!r) return;

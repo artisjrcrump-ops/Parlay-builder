@@ -91,11 +91,13 @@ const ODDS_FAIL = {};
 let oddsError = null; // last SportsGameOdds failure, shown above picks (sportChips)
 
 function oddsErrorNote() {
-  if (!oddsError || Date.now() - oddsError.at > 30 * 60 * 1000) return "";
+  if (!oddsError || Date.now() - oddsError.at > 30 * 60 * 1000) {
+    return LINE_SOURCE === "DraftKings" ? `<p class="note">Lines and prices are DraftKings' (from ESPN). FanDuel's are usually close.</p>` : "";
+  }
   const limit = /limit|quota|exceed|429|rate/i.test(oddsError.msg);
-  return `<p class="warn">FanDuel lines didn't load for ${oddsError.league}: "${oddsError.msg}".${limit
-    ? " That usually means the free SportsGameOdds key hit its monthly limit; it resets next month, or check your usage at sportsgameodds.com."
-    : /key/i.test(oddsError.msg) ? " Check your key in ⚙︎ Settings." : " Try again in a few minutes."}</p>`;
+  return `<p class="warn">FanDuel lines didn't load for ${oddsError.league} ("${oddsError.msg}"), so these picks use DraftKings' lines from ESPN instead. Prices may differ a little on FanDuel.${limit
+    ? " The free SportsGameOdds key hit its monthly limit; it resets next month."
+    : /key/i.test(oddsError.msg) ? " Check your key in ⚙︎ Settings." : ""}</p>`;
 }
 
 // One request per league per day, cached, to stay inside the free monthly allowance.
@@ -181,9 +183,19 @@ function doubleDoubleLine(ev, pid) {
 }
 
 // Returns { statKey: { line, over, under } } for this player, or null when unavailable.
-async function getPlayerLines(game, playerName) {
-  const events = await loadOddsEvents(game);
-  if (!events) return null;
+// Lines for one player: FanDuel via SportsGameOdds when the key works, otherwise
+// DraftKings via ESPN's free feed (espnodds.js). LINE_SOURCE says which one answered.
+let LINE_SOURCE = "FanDuel";
+async function getPlayerLines(game, playerName, playerId) {
+  let events = null;
+  if (oddsKey()) {
+    try { events = await loadOddsEvents(game); } catch { events = null; }
+  }
+  if (!events) {
+    LINE_SOURCE = "DraftKings";
+    return espnPlayerLines(game, playerId);
+  }
+  LINE_SOURCE = "FanDuel";
   const ev = events.find((e) => teamMatches(e.home, game.home) && teamMatches(e.away, game.away));
   if (!ev) return {};
   if (ev.dkEvent) GAME_DK[game.id] = ev.dkEvent;
