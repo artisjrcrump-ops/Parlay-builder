@@ -545,3 +545,4 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .copy-name { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: 700; cursor: pointer; text-align: left; }
 .plus-block { border-left: 3px solid var(--line); padding: 4px 0 4px 10px; margin: 8px 0; }
 .bank-now { display: flex; align-items: center; gap: 6px; margin: 8px 0 2px; }
+.lines-pick { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }

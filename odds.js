@@ -187,13 +187,20 @@ function doubleDoubleLine(ev, pid) {
 // DraftKings via ESPN's free feed (espnodds.js). LINE_SOURCE says which one answered.
 let LINE_SOURCE = "FanDuel";
 async function getPlayerLines(game, playerName, playerId) {
+  // Default: free DraftKings lines (no limit). FanDuel via the key only when turned on in
+  // Settings, or when DraftKings has nothing for this player (e.g. some college games).
+  const fdFirst = loadPref("lines", "dk") === "fd";
+  if (!fdFirst) {
+    const dk = await espnPlayerLines(game, playerId).catch(() => ({}));
+    if (Object.keys(dk).length || !oddsKey()) { LINE_SOURCE = "DraftKings"; return dk; }
+  }
   let events = null;
   if (oddsKey()) {
     try { events = await loadOddsEvents(game); } catch { events = null; }
   }
   if (!events) {
     LINE_SOURCE = "DraftKings";
-    return espnPlayerLines(game, playerId);
+    return fdFirst ? espnPlayerLines(game, playerId) : {};
   }
   LINE_SOURCE = "FanDuel";
   const ev = events.find((e) => teamMatches(e.home, game.home) && teamMatches(e.away, game.away));
@@ -261,6 +268,12 @@ function openSettings() {
       <p id="sgo-msg" class="note">${has ? "A key is saved on this device." : "No key saved yet."}
         The key is stored only on this phone, never in the app's code.
         Get a free one at <a href="https://sportsgameodds.com/pricing" target="_blank" rel="noopener">sportsgameodds.com</a>.</p>
+      <label class="lines-pick">Lines for picks
+        <select id="lines-src">
+          <option value="dk" ${loadPref("lines", "dk") === "dk" ? "selected" : ""}>DraftKings (free, no limit)</option>
+          <option value="fd" ${loadPref("lines", "dk") === "fd" ? "selected" : ""}>FanDuel (uses your key's monthly limit)</option>
+        </select></label>
+      <p class="note">With DraftKings picked, your key is only used for games DraftKings has no props for.</p>
       <p id="app-version" class="note app-version">Version ${APP_VERSION} · checking for updates…</p>
     </div>`;
   openSheet();
@@ -268,6 +281,13 @@ function openSettings() {
 }
 
 $("settings").addEventListener("click", openSettings);
+
+$("sheet-body").addEventListener("change", (e) => {
+  if (e.target.id !== "lines-src") return;
+  savePref("lines", e.target.value);
+  sheet.sportCache = {};
+  sheet.autoCache = null;
+});
 
 $("sheet-body").addEventListener("click", (e) => {
   if (e.target.id === "sgo-save") {
