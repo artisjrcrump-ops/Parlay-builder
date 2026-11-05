@@ -1,6 +1,6 @@
 :root { --bg: #0f1115; --card: #181b22; --line: #2a2f3a; --text: #eef0f4; --muted: #9aa3b2; --accent: #4f8cff; --good: #22c55e; --gold: #f5c542; }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 0 16px 40px; max-width: 640px; margin: 0 auto; }
+body { background: var(--bg); color: var(--text); font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: env(safe-area-inset-top) 16px 40px; max-width: 640px; margin: 0 auto; }
 header { padding: 18px 0 8px; }
 h1 { margin: 0; font-size: 26px; }
 .sub { margin: 4px 0 12px; color: var(--muted); font-size: 14px; }
@@ -50,3 +50,11 @@ summary .cnt { margin-left: auto; color: var(--gold); font-size: 13px; }
 .pill { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--gold); color: #111; font-size: 12px; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 #update { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--accent); background: none; color: var(--accent); font: inherit; font-weight: 700; }
+.install { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; color: var(--text); font-size: 13px; }
+@media (display-mode: standalone) { .install { display: none; } }
+.me { color: var(--muted); font-size: 13px; text-align: center; margin: 10px 0 0; }
+.link { background: none; border: 0; color: var(--accent); font: inherit; padding: 0; text-decoration: underline; }
+.ranks { display: grid; gap: 2px; font-size: 13px; color: var(--muted); margin: -2px 0 8px; }
+.ranks b { color: var(--text); }
+.ranks .good { color: var(--good); font-weight: 700; }
+.ranks .bad { color: #f87171; font-weight: 700; }

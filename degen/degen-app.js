@@ -15,6 +15,10 @@ const WEB = "https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/
 const CORE = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/";
 const STANDINGS = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings";
 
+// Shared picks board: a free ntfy.sh topic (no account). Each "Share picks" posts that
+// person's picks there; Update reads the latest per person. ntfy keeps posts for 12 hours.
+const SYNC = "https://ntfy.sh/degen-parlays-82ef139de2c7";
+
 const MIN_LEGS = 6;
 const MAX_LEGS = 8;
 const TARGET = 1000; // aim for about $1,000 back, stake included
@@ -39,7 +43,7 @@ const store = {
   get: (k, d) => { try { return localStorage.getItem(`dg.${k}`) ?? d; } catch { return d; } },
   set: (k, v) => { try { localStorage.setItem(`dg.${k}`, v); } catch { /* private mode */ } },
 };
-const state = { who: store.get("who", ""), games: [], board: [], legs: [], stake: parseFloat(store.get("stake", "10")) || 10 };
+const state = { me: store.get("me", ""), who: store.get("who", ""), games: [], board: [], legs: [], stake: parseFloat(store.get("stake", "10")) || 10 };
 
 const getJSON = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
 const ymd = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -72,15 +76,17 @@ async function loadGames() {
   });
 }
 
-// Defense rank by points allowed per game (1 = stingiest).
+// Ranks from the standings: defense by points allowed (1 = stingiest), offense by points scored (1 = most).
 async function loadDefense() {
   const data = await getJSON(STANDINGS);
   const walk = (n) => (n.standings ? n.standings.entries : (n.children || []).flatMap(walk));
   const rows = walk(data).map((e) => {
     const s = Object.fromEntries(e.stats.map((x) => [x.name, x.value]));
-    return { id: e.team.id, papg: s.avgPointsAgainst };
-  }).filter((r) => Number.isFinite(r.papg)).sort((a, b) => a.papg - b.papg);
-  return Object.fromEntries(rows.map((r, i) => [r.id, { rank: i + 1, n: rows.length }]));
+    return { id: e.team.id, papg: s.avgPointsAgainst, ppg: s.avgPointsFor };
+  }).filter((r) => Number.isFinite(r.papg));
+  const off = [...rows].sort((a, b) => b.ppg - a.ppg).map((r) => r.id);
+  rows.sort((a, b) => a.papg - b.papg);
+  return Object.fromEntries(rows.map((r, i) => [r.id, { rank: i + 1, n: rows.length, off: off.indexOf(r.id) + 1, papg: r.papg, ppg: r.ppg }]));
 }
 
 async function loadRoster(teamId) {
@@ -210,7 +216,7 @@ async function loadBoard(progress) {
         if (/out|doubtful/i.test(status)) continue; // ruled-out players never make it in
         if (props[i][p.id]) players.push({ ...p, status, team: team.abbr, opp, gameId: g.id, props: props[i][p.id], def: defense[opp.id] });
       }
-      teams.push({ team, opp, game: g, def: defense[opp.id], players });
+      teams.push({ team, opp, game: g, def: defense[opp.id], own: defense[team.id], players });
     }
   }
   const all = teams.flatMap((t) => t.players);
@@ -265,6 +271,7 @@ function buildParlay(picks) {
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const time = (g) => (g.state === "pre" ? g.date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "Live");
+const tone = (rank) => (rank <= 10 ? "good" : rank >= 21 ? "bad" : "");
 const nth = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : { 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th"}`;
 
 function renderWho() {
@@ -273,7 +280,8 @@ function renderWho() {
 }
 
 function renderStatus() {
-  if (!state.who) { $("status").textContent = "Who are you? Tap your name."; return; }
+  if (!state.me) { $("status").textContent = "Who are you? Tap your name (one time)."; return; }
+  if (!state.who) { $("status").textContent = ""; return; }
   const mine = TEAMS[state.who];
   const games = state.games.filter((g) => mine.includes(g.away.abbr) || mine.includes(g.home.abbr));
   const open = games.filter((g) => g.state !== "post");
@@ -292,13 +300,45 @@ function loadSlip(who) {
     return slip && slip.at >= today ? slip : { legs: [], at: 0 }; // yesterday's picks drop off
   } catch { return { legs: [], at: 0 }; }
 }
+const isMine = () => state.who && state.who === state.me;
 function saveSlip() {
-  if (!state.who) return;
+  if (!isMine()) return; // you can only change your own picks
   const legs = state.legs.map((l) => Object.fromEntries(KEEP.map((k) => [k, l[k]])));
   store.set(`slip.${state.who}`, JSON.stringify({ legs, at: Date.now(), shared: state.shared || 0 }));
 }
 const b64 = (str) => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const unb64 = (str) => decodeURIComponent(escape(atob(str.replace(/-/g, "+").replace(/_/g, "/"))));
+// Post my picks to the shared board.
+async function pushPicks() {
+  const legs = state.legs.filter((l) => l.on).map((l) => [l.player, l.text, l.odds, l.team, l.opp, l.id, l.l5, l.l5n, l.all, l.n]);
+  const r = await fetch(SYNC, { method: "POST", body: JSON.stringify({ w: state.who, d: ymd(new Date()), s: state.stake, l: legs }) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+}
+
+// Pull everyone's latest shared picks; a newer copy replaces what this phone has.
+async function pullPicks() {
+  const text = await fetch(`${SYNC}/json?poll=1&since=12h`).then((r) => (r.ok ? r.text() : ""));
+  const latest = {};
+  for (const line of text.split("\n")) {
+    try {
+      const m = JSON.parse(line);
+      if (m.event !== "message") continue;
+      const data = JSON.parse(m.message);
+      if (!TEAMS[data.w] || data.d !== ymd(new Date()) || !Array.isArray(data.l)) continue;
+      if (!latest[data.w] || m.time > latest[data.w].time) latest[data.w] = { time: m.time, data };
+    } catch { /* skip anything that isn't a pick post */ }
+  }
+  for (const [w, { time, data }] of Object.entries(latest)) {
+    const mine = loadSlip(w);
+    if (time * 1000 <= mine.at) continue; // this phone has newer edits
+    store.set(`slip.${w}`, JSON.stringify({ legs: fromWire(data.l), at: time * 1000, shared: 1, stake: data.s }));
+  }
+  return Object.keys(latest);
+}
+
+const fromWire = (l) => l.map(([player, text, odds, team, opp, id, l5, l5n, all, n]) =>
+  ({ id, pid: String(id).split("|")[0], player, text, odds, dec: dec(odds), team, opp, alt: /\+ /.test(text), stat: String(id).split("|")[1], l5, l5n, all, n, on: true }));
+
 function shareLink() {
   const legs = state.legs.filter((l) => l.on).map((l) => [l.player, l.text, l.odds, l.team, l.opp, l.id, l.l5, l.l5n, l.all, l.n]);
   const data = { w: state.who, d: ymd(new Date()), s: state.stake, l: legs };
@@ -311,9 +351,8 @@ function importLink() {
   try {
     const data = JSON.parse(unb64(m[1]));
     if (!TEAMS[data.w] || !Array.isArray(data.l)) return null;
-    const legs = data.l.map(([player, text, odds, team, opp, id, l5, l5n, all, n]) =>
-      ({ id, pid: String(id).split("|")[0], player, text, odds, dec: dec(odds), team, opp, alt: /\+ /.test(text), stat: String(id).split("|")[1], l5, l5n, all, n, on: true }));
-    store.set(`slip.${data.w}`, JSON.stringify({ legs, at: Date.now(), shared: 1, day: data.d }));
+    const legs = fromWire(data.l);
+    if (data.w !== store.get("me", "") && data.d === ymd(new Date())) store.set(`slip.${data.w}`, JSON.stringify({ legs, at: Date.now(), shared: 1, stake: data.s }));
     return data.w;
   } catch { return null; }
 }
@@ -330,7 +369,11 @@ function renderBoard() {
   if (!state.board.length) { $("board").innerHTML = ""; return; }
   $("board").innerHTML = state.board.map((t) => `
     <div class="card team">
-      <h2>${t.team.abbr} <span class="vs">vs ${t.opp.abbr}${t.def ? ` (${nth(t.def.rank)} D)` : ""} · ${time(t.game)}</span></h2>
+      <h2>${t.team.abbr} <span class="vs">vs ${t.opp.abbr} · ${time(t.game)}</span></h2>
+      ${t.own && t.def ? `<div class="ranks">
+        <div><b>${t.team.abbr}</b> Off <span class="${tone(t.own.off)}">${nth(t.own.off)}</span> · Def <span class="${tone(t.own.rank)}">${nth(t.own.rank)}</span></div>
+        <div><b>${t.opp.abbr}</b> Off <span class="${tone(t.def.off)}">${nth(t.def.off)}</span> · Def <span class="${tone(t.def.rank)}">${nth(t.def.rank)}</span>${t.def.rank >= 21 ? " 🔥 soft D" : t.def.rank <= 10 ? " 🧱 tough D" : ""}</div>
+      </div>` : ""}
       ${t.players.length ? t.players.map((p) => `
         <details ${p.recs.length ? "open" : ""}>
           <summary><b>${esc(p.name)}</b>${p.status ? ` <em>${esc(p.status)}</em>` : ""}<span class="cnt">${p.recs.length ? `⭐ ${p.recs.length}` : ""}</span></summary>
@@ -341,31 +384,59 @@ function renderBoard() {
 }
 
 function renderParlay() {
-  saveSlip();
   renderWho();
-  const on = state.legs.filter((l) => l.on);
+  const mine = isMine();
+  const slip = mine ? { legs: state.legs, stake: state.stake } : loadSlip(state.who);
+  const stake = slip.stake || state.stake;
+  const on = slip.legs.filter((l) => l.on);
   const d = on.reduce((t, l) => t * l.dec, 1);
+  const hits = (l) => `${l.team} vs ${l.opp} · ${l.n ? `${l.l5}/${l.l5n} last 5 · ${l.all}/${l.n} season` : "no recent games"}`;
+  if (!state.who) { $("parlay").innerHTML = ""; return; }
+  if (!mine) {
+    const when = slip.at ? new Date(slip.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+    $("parlay").innerHTML = `<div class="card slip">
+      <h2>${state.who}'s picks${on.length ? ` · ${on.length} legs` : ""}</h2>
+      ${on.length ? on.map((l) => `<div class="leg"><span class="main"><b>${esc(l.player)}</b> ${esc(l.text)}${l.alt ? " 🪜" : ""}<small>${esc(hits(l))}</small></span><span class="odds">${signed(l.odds)}</span></div>`).join("") + `
+      <div class="pay"><span>$${stake} stake</span><span>${american(d)} · pays <b>${money(stake * d)}</b></span></div>
+      <p class="note">Shared at ${when}. Only ${state.who} can change these. Tap ↻ Update for the latest.</p>
+      <div class="row"><button id="copy">📋 Copy</button></div>`
+      : `<p class="note">${state.who} hasn't shared picks today yet. Tap ↻ Update to check again.</p>`}
+    </div>`;
+    return;
+  }
   $("parlay").innerHTML = state.legs.length ? `
     <div class="card slip">
-      <h2>${state.who}'s picks · ${on.length} legs</h2>
+      <h2>My picks · ${on.length} legs</h2>
       ${state.legs.map((l, i) => `
         <label class="leg ${l.on ? "" : "off"}"><input type="checkbox" data-leg="${i}" ${l.on ? "checked" : ""}>
-          <span class="main"><b>${esc(l.player)}</b> ${l.text}${l.alt ? " 🪜" : ""}<small>${l.team} vs ${l.opp} · ${l.n ? `${l.l5}/${l.l5n} last 5 · ${l.all}/${l.n} season` : "no recent games"}</small></span>
+          <span class="main"><b>${esc(l.player)}</b> ${esc(l.text)}${l.alt ? " 🪜" : ""}<small>${esc(hits(l))}</small></span>
           <span class="odds">${signed(l.odds)}</span><button class="x" data-del="${i}" aria-label="Remove">✕</button></label>`).join("")}
       <div class="pay"><label>Stake $<input id="stake" type="number" inputmode="decimal" min="1" value="${state.stake}"></label>
         <span>${on.length ? american(d) : "–"} · pays <b>${money(state.stake * d)}</b></span></div>
-      <p class="note">Tap any prop below to add or remove it. Same-game legs get repriced by the book, so the real payout is usually a bit lower.</p>
+      <p class="note">Tap any prop below to add or remove it. Tap 📤 Share so the others see your picks. Same-game legs get repriced by the book, so the real payout is usually a bit lower.</p>
       <div class="row"><button id="share">📤 Share picks</button><button id="copy">📋 Copy</button><button id="clear">Clear</button></div>
     </div>` : "";
 }
 
-function renderAll() { renderWho(); renderStatus(); renderParlay(); renderBoard(); $("build").hidden = !state.board.some((t) => t.players.length); }
+// After any change to my picks: save them, then redraw.
+function changed() { saveSlip(); renderParlay(); renderBoard(); }
+
+function renderAll() {
+  renderWho(); renderStatus(); renderParlay(); renderBoard();
+  $("build").hidden = !isMine() || !state.board.some((t) => t.players.length);
+  $("me").innerHTML = state.me ? `You're ${state.me}. You can only pick from your own teams. <button id="notme" class="link">Not ${state.me}?</button>` : "";
+}
 
 async function load() {
   const who = state.who;
   state.board = []; state.legs = loadSlip(who).legs;
   renderAll();
   if (!who) return;
+  await pullPicks().catch(() => []);
+  if (state.who !== who) return;
+  if (!isMine()) { renderAll(); return; } // other people's tabs only show their shared picks
+  state.legs = loadSlip(who).legs;
+  renderAll();
   try {
     const board = await loadBoard((msg) => { if (state.who === who) $("status").textContent = msg; });
     if (state.who !== who) return; // switched names while loading
@@ -381,16 +452,23 @@ document.addEventListener("click", (e) => {
   const t = e.target.closest("button");
   if (!t) return;
   if (t.dataset.who) {
+    if (!state.me) { state.me = t.dataset.who; store.set("me", state.me); state.who = ""; }
     if (t.dataset.who === state.who) return;
     state.who = t.dataset.who;
     store.set("who", state.who);
     load();
   } else if (t.id === "update") {
     update(t);
+  } else if (t.id === "notme") {
+    state.me = ""; store.set("me", ""); state.who = ""; store.set("who", "");
+    state.board = []; state.legs = [];
+    renderAll();
+  } else if (!isMine() && t.id !== "copy") {
+    // someone else's tab: look, don't touch
   } else if (t.id === "build") {
     state.legs = buildParlay(topPicks());
     if (!state.legs.length) $("status").textContent = "No ⭐ picks yet today. Tap props below to make your own.";
-    renderParlay(); renderBoard();
+    changed();
     $("parlay").scrollIntoView({ behavior: "smooth" });
   } else if (t.dataset.opt) {
     const id = t.dataset.opt;
@@ -400,30 +478,29 @@ document.addEventListener("click", (e) => {
       const o = state.board.flatMap((x) => x.players).flatMap((p) => p.stats).flatMap((s) => s.options).find((x) => x.id === id);
       if (o) state.legs = state.legs.filter((l) => !(l.pid === o.pid && l.stat === o.stat)).concat({ ...o, on: true }); // one line per stat
     }
-    renderParlay(); renderBoard();
+    changed();
   } else if (t.dataset.del) {
     e.preventDefault();
     state.legs.splice(+t.dataset.del, 1);
-    renderParlay(); renderBoard();
+    changed();
   } else if (t.id === "clear") {
     state.legs = [];
-    renderParlay(); renderBoard();
+    changed();
   } else if (t.id === "share") {
-    const url = shareLink();
-    const text = `${state.who}'s picks:\n${state.legs.filter((l) => l.on).map((l) => `${l.player} ${l.text}`).join("\n")}\n${url}`;
-    if (navigator.share) navigator.share({ title: `${state.who}'s picks`, text }).catch(() => {});
-    else navigator.clipboard?.writeText(text).then(() => { t.textContent = "Link copied ✓"; }, () => {});
+    t.textContent = "Sharing…";
+    pushPicks().then(() => { t.textContent = "Shared ✓ (others tap Update)"; }, () => { t.textContent = "Couldn't share. Try again"; });
   } else if (t.id === "copy") {
-    const text = state.legs.filter((l) => l.on).map((l) => `${l.player} ${l.text}`).join("\n");
+    const legs = isMine() ? state.legs : loadSlip(state.who).legs;
+    const text = legs.filter((l) => l.on).map((l) => `${l.player} ${l.text}`).join("\n");
     navigator.clipboard?.writeText(text).then(() => { t.textContent = "Copied ✓"; }, () => { t.textContent = "Couldn't copy"; });
   }
 });
 
 document.addEventListener("change", (e) => {
-  if (e.target.dataset.leg) { state.legs[+e.target.dataset.leg].on = e.target.checked; renderParlay(); }
+  if (e.target.dataset.leg && isMine()) { state.legs[+e.target.dataset.leg].on = e.target.checked; changed(); }
   if (e.target.id === "stake") {
     const v = parseFloat(e.target.value);
-    if (v > 0) { state.stake = v; store.set("stake", String(v)); renderParlay(); }
+    if (v > 0) { state.stake = v; store.set("stake", String(v)); changed(); }
   }
 });
 
@@ -438,6 +515,7 @@ async function update(btn) {
 (async function start() {
   const from = importLink();
   if (from) { state.who = from; store.set("who", from); }
+  if (!state.me) state.who = "";
   renderWho();
   $("status").textContent = "Loading today's games…";
   try {

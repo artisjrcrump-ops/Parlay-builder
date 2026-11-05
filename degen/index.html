@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0f1115">
   <title>Degen Parlays</title>
-  <link rel="stylesheet" href="degen.css?v=4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Degen">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" href="icon-192.png">
+  <link rel="stylesheet" href="degen.css?v=6">
 </head>
 <body>
   <header>
@@ -14,12 +21,13 @@
     <div id="who" class="who"></div>
   </header>
   <main>
+    <p id="me" class="me"></p>
     <p id="status" class="status"></p>
     <button id="build" class="big" hidden>⚡ Build my parlay from ⭐ picks</button>
     <section id="parlay"></section>
     <section id="board"></section>
   </main>
-  <footer>Picks from DraftKings lines (via ESPN) and each player's recent games. Past results, not guarantees. Check prices in your sportsbook.</footer>
-  <script src="degen-app.js?v=4"></script>
+  <footer><p id="install" class="install">📲 Add to your home screen: iPhone, tap Share then "Add to Home Screen". Android, tap ⋮ then "Add to Home screen".</p>Picks from DraftKings lines (via ESPN) and each player's recent games. Past results, not guarantees. Check prices in your sportsbook.</footer>
+  <script src="degen-app.js?v=6"></script>
 </body>
 </html>
