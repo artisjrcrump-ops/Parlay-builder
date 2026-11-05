@@ -191,7 +191,7 @@ function renderBoard(games) {
   const shown = degen ? games.filter(degenGame) : games;
   const active = shown.filter((g) => g.state !== "post");
   const done = shown.filter((g) => g.state === "post");
-  $("games").innerHTML = (degen ? `<p class="note degen-note">🎲 Degen mode: ${active.length} game${active.length === 1 ? "" : "s"} with your group's teams left${shown.length < games.length ? ` (${games.length - shown.length} hidden)` : ""}. Only players on those teams count.</p>` : "")
+  $("games").innerHTML = (degen ? `<p class="note degen-note">🎲 Degen · ${degenPick()}: ${active.length ? `${active.length} game${active.length === 1 ? "" : "s"} with ${degenPick()}'s teams left` : `no ${degenPick()} teams play on this day`}${shown.length < games.length ? ` (${games.length - shown.length} other games hidden)` : ""}. Only ${degenPick()}'s players count.</p>` : "")
     + active.map(gameCard).join("")
     + (done.length ? `<details class="finals" ${active.length ? "" : "open"}><summary>Final scores (${done.length})</summary>${done.map(finalRow).join("")}</details>` : "");
 }
