@@ -32,10 +32,15 @@ const STAT = {
   "Total Points, Rebounds, and Assists": "pra", "Points + Assists + Rebounds": "pra",
   "Total Points and Rebounds": "pr", "Points + Rebounds": "pr",
   "Total Points and Assists": "pa", "Points + Assists": "pa",
-  "Total Assists and Rebounds": "ra", "Assists + Rebounds": "ra",
+  "Total Assists and Rebounds": "ra", "Assists + Rebounds": "ra", "Rebounds + Assists": "ra",
+  "Total Steals": "steals", "Steals": "steals",
+  "Total Blocks": "blocks", "Blocks": "blocks",
+  "Total Steals and Blocks": "sb", "Steals + Blocks": "sb",
 };
-const LABEL = { points: "PTS", rebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA", pr: "P+R", pa: "P+A", ra: "R+A" };
-const PARTS = { pra: ["points", "rebounds", "assists"], pr: ["points", "rebounds"], pa: ["points", "assists"], ra: ["rebounds", "assists"] };
+// Yes-only markets, treated as a "1+" rung.
+const YES = { "To Record a Double Double": "dd", "To Record a Triple Double": "td" };
+const LABEL = { points: "PTS", rebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA", pr: "P+R", pa: "P+A", ra: "R+A", steals: "STL", blocks: "BLK", sb: "STL+BLK", dd: "Double-double", td: "Triple-double" };
+const PARTS = { pra: ["points", "rebounds", "assists"], pr: ["points", "rebounds"], pa: ["points", "assists"], ra: ["rebounds", "assists"], sb: ["steals", "blocks"], dd: ["dd"], td: ["dd"] };
 const parts = (k) => PARTS[k] || [k];
 
 const $ = (id) => document.getElementById(id);
@@ -43,7 +48,7 @@ const store = {
   get: (k, d) => { try { return localStorage.getItem(`dg.${k}`) ?? d; } catch { return d; } },
   set: (k, v) => { try { localStorage.setItem(`dg.${k}`, v); } catch { /* private mode */ } },
 };
-const state = { me: store.get("me", ""), who: store.get("who", ""), games: [], board: [], legs: [], stake: parseFloat(store.get("stake", "10")) || 10 };
+const state = { view: store.get("view", "main"), me: store.get("me", ""), who: store.get("who", ""), games: [], board: [], legs: [], stake: parseFloat(store.get("stake", "10")) || 10 };
 
 const getJSON = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
 const ymd = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -123,11 +128,16 @@ async function loadLog(id) {
         rows.push({
           date: new Date(meta.gameDate), opp: meta.opponent?.abbreviation || "",
           points: s.points || 0, rebounds: s.totalRebounds || 0, assists: s.assists || 0, threes: s.threePointFieldGoalsMade || 0,
+          steals: s.steals || 0, blocks: s.blocks || 0,
         });
       }
     }
   }
-  rows.forEach((r) => { r.pra = r.points + r.rebounds + r.assists; r.pr = r.points + r.rebounds; r.pa = r.points + r.assists; r.ra = r.rebounds + r.assists; });
+  rows.forEach((r) => {
+    r.pra = r.points + r.rebounds + r.assists; r.pr = r.points + r.rebounds; r.pa = r.points + r.assists; r.ra = r.rebounds + r.assists; r.sb = r.steals + r.blocks;
+    const tens = [r.points, r.rebounds, r.assists, r.steals, r.blocks].filter((v) => v >= 10).length;
+    r.dd = tens >= 2 ? 1 : 0; r.td = tens >= 3 ? 1 : 0;
+  });
   return rows.sort((a, b) => b.date - a.date);
 }
 
@@ -143,9 +153,15 @@ async function loadProps(gameId) {
     const aid = (it.athlete?.$ref || "").match(/athletes\/(\d+)/)?.[1];
     const name = it.type?.name || "";
     if (!aid || /1st|2nd|3rd|4th|Quarter|Half/.test(name)) continue;
-    const stat = STAT[name.replace(/ Milestones$/, "")];
     const odds = parseInt(it.odds?.american?.value, 10);
-    if (!stat || !Number.isFinite(odds)) continue;
+    if (!Number.isFinite(odds)) continue;
+    if (YES[name]) { // yes comes first
+      const y = ((out[aid] ||= {})[YES[name]] ||= { line: NaN, over: null, alts: {} });
+      if (!(1 in y.alts)) y.alts[1] = odds;
+      continue;
+    }
+    const stat = STAT[name.replace(/ Milestones$/, "")];
+    if (!stat) continue;
     const s = ((out[aid] ||= {})[stat] ||= { line: NaN, over: null, alts: {} });
     if (/Milestones$/.test(name)) {
       const thr = parseFloat(it.odds?.total?.value ?? it.current?.target?.value);
@@ -190,7 +206,7 @@ function propOptions(player, stat, prop, rows, def) {
     const prob = rows.length ? Math.min(0.97, 0.6 * (all / rows.length) + 0.4 * (l5 / last5.length) + (defPct - 0.5) * 0.06) : 0;
     // A rung he keeps clearing: 4+ of last 5, 70%+ of the season, priced about -400 to -105.
     const rec = d >= 1.25 && d <= 1.95 && last5.length >= 4 && l5 >= last5.length - 1 && all / rows.length >= 0.7 && est - t > -0.5 && prob - 1 / d > 0;
-    options.push({ ...base, id: `${player.id}|${stat}|a${t}`, sort: t - 0.5, text: `${t}+ ${LABEL[stat]}`, alt: true, odds, dec: d, l5, l5n: last5.length, all, n: rows.length, prob, value: prob - 1 / d, rec });
+    options.push({ ...base, id: `${player.id}|${stat}|a${t}`, sort: t - 0.5, text: stat === "dd" || stat === "td" ? LABEL[stat] : `${t}+ ${LABEL[stat]}`, alt: true, odds, dec: d, l5, l5n: last5.length, all, n: rows.length, prob, value: prob - 1 / d, rec });
   }
   return options.sort((a, b) => a.sort - b.sort);
 }
@@ -366,21 +382,33 @@ function optionRow(o) {
 }
 
 function renderBoard() {
-  if (!state.board.length) { $("board").innerHTML = ""; return; }
-  $("board").innerHTML = state.board.map((t) => `
+  if (!state.board.length || !isMine()) { $("board").innerHTML = ""; return; }
+  const alt = state.view === "alt";
+  const pick = (opts) => opts.filter((o) => !!o.alt === alt);
+  const tabs = `<div class="views">
+    <button data-view="main" class="${alt ? "" : "on"}">Main lines</button>
+    <button data-view="alt" class="${alt ? "on" : ""}">🪜 Alt lines</button></div>
+    <p class="note">${alt ? "Every DraftKings X+ alt line for your teams (points, boards, dimes, threes, combos, steals, blocks, double-doubles)." : "DraftKings main over lines for your teams."} ⭐ = our pick. Tap to add.</p>`;
+  $("board").innerHTML = tabs + state.board.map((t) => {
+    const players = t.players.map((p) => ({ p, stats: p.stats.map((s) => ({ ...s, options: pick(s.options) })).filter((s) => s.options.length) }))
+      .filter((x) => x.stats.length)
+      .map((x) => ({ ...x, recs: x.stats.flatMap((s) => s.options.filter((o) => o.rec)).length }))
+      .sort((a, b) => b.recs - a.recs);
+    return `
     <div class="card team">
       <h2>${t.team.abbr} <span class="vs">vs ${t.opp.abbr} · ${time(t.game)}</span></h2>
       ${t.own && t.def ? `<div class="ranks">
         <div><b>${t.team.abbr}</b> Off <span class="${tone(t.own.off)}">${nth(t.own.off)}</span> · Def <span class="${tone(t.own.rank)}">${nth(t.own.rank)}</span></div>
         <div><b>${t.opp.abbr}</b> Off <span class="${tone(t.def.off)}">${nth(t.def.off)}</span> · Def <span class="${tone(t.def.rank)}">${nth(t.def.rank)}</span>${t.def.rank >= 21 ? " 🔥 soft D" : t.def.rank <= 10 ? " 🧱 tough D" : ""}</div>
       </div>` : ""}
-      ${t.players.length ? t.players.map((p) => `
-        <details ${p.recs.length ? "open" : ""}>
-          <summary><b>${esc(p.name)}</b>${p.status ? ` <em>${esc(p.status)}</em>` : ""}<span class="cnt">${p.recs.length ? `⭐ ${p.recs.length}` : ""}</span></summary>
-          ${p.stats.map((s) => `<div class="stat"><h3>${LABEL[s.stat]}${Number.isFinite(p.props[s.stat].line) ? ` · line ${p.props[s.stat].line}` : ""}${s.options[0]?.n ? ` · est ${s.options[0].est}` : ""}</h3>
+      ${players.length ? players.map(({ p, stats, recs }) => `
+        <details ${recs ? "open" : ""}>
+          <summary><b>${esc(p.name)}</b>${p.status ? ` <em>${esc(p.status)}</em>` : ""}<span class="cnt">${recs ? `⭐ ${recs}` : ""}</span></summary>
+          ${stats.map((s) => `<div class="stat"><h3>${LABEL[s.stat]}${Number.isFinite(p.props[s.stat].line) ? ` · line ${p.props[s.stat].line}` : ""}${s.options[0]?.n && Number.isFinite(s.options[0].est) && !/^(dd|td)$/.test(s.stat) ? ` · est ${s.options[0].est}` : ""}</h3>
             <div class="opts">${s.options.map(optionRow).join("")}</div></div>`).join("")}
-        </details>`).join("") : `<p class="note">No props posted for ${t.team.abbr} yet. They usually show up a few hours before tip-off.</p>`}
-    </div>`).join("");
+        </details>`).join("") : `<p class="note">No ${alt ? "alt" : "main"} lines posted for ${t.team.abbr} yet. They usually show up a few hours before tip-off.</p>`}
+    </div>`;
+  }).join("");
 }
 
 function renderParlay() {
@@ -459,6 +487,9 @@ document.addEventListener("click", (e) => {
     load();
   } else if (t.id === "update") {
     update(t);
+  } else if (t.dataset.view) {
+    state.view = t.dataset.view; store.set("view", state.view);
+    renderBoard();
   } else if (t.id === "notme") {
     state.me = ""; store.set("me", ""); state.who = ""; store.set("who", "");
     state.board = []; state.legs = [];

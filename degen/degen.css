@@ -58,3 +58,6 @@ summary .cnt { margin-left: auto; color: var(--gold); font-size: 13px; }
 .ranks b { color: var(--text); }
 .ranks .good { color: var(--good); font-weight: 700; }
 .ranks .bad { color: #f87171; font-weight: 700; }
+.views { display: flex; gap: 6px; margin-top: 8px; }
+.views button { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-weight: 700; }
+.views button.on { background: var(--gold); border-color: var(--gold); color: #111; }
