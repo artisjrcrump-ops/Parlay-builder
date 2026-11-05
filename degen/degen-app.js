@@ -269,7 +269,7 @@ const nth = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : { 1: "st", 2: 
 
 function renderWho() {
   $("who").innerHTML = Object.keys(TEAMS).map((w) =>
-    `<button class="${w === state.who ? "on" : ""}" data-who="${w}">${w}<small>${TEAMS[w].join(" ")}</small></button>`).join("");
+    { const n = w === state.who ? state.legs.length : loadSlip(w).legs.length; return `<button class="${w === state.who ? "on" : ""}" data-who="${w}">${w}${n ? ` <span class="pill">${n}</span>` : ""}<small>${TEAMS[w].join(" ")}</small></button>`; }).join("");
 }
 
 function renderStatus() {
@@ -280,6 +280,42 @@ function renderStatus() {
   if (!open.length) { $("status").textContent = games.length ? `${state.who}'s games today are over.` : `None of ${state.who}'s teams play today.`; return; }
   const playing = [...new Set(open.flatMap((g) => [g.away.abbr, g.home.abbr]).filter((a) => mine.includes(a)))];
   $("status").textContent = `${state.who}'s teams today: ${playing.join(", ")}`;
+}
+
+// Each person's picks live in their own tab, saved on this phone. "Share my picks" makes a
+// link with the picks inside it; opening it fills that person's tab for whoever taps it.
+const KEEP = ["id", "pid", "player", "text", "odds", "dec", "team", "opp", "gameId", "stat", "alt", "l5", "l5n", "all", "n", "on"];
+function loadSlip(who) {
+  const today = new Date().setHours(0, 0, 0, 0);
+  try {
+    const slip = JSON.parse(store.get(`slip.${who}`, "null"));
+    return slip && slip.at >= today ? slip : { legs: [], at: 0 }; // yesterday's picks drop off
+  } catch { return { legs: [], at: 0 }; }
+}
+function saveSlip() {
+  if (!state.who) return;
+  const legs = state.legs.map((l) => Object.fromEntries(KEEP.map((k) => [k, l[k]])));
+  store.set(`slip.${state.who}`, JSON.stringify({ legs, at: Date.now(), shared: state.shared || 0 }));
+}
+const b64 = (str) => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64 = (str) => decodeURIComponent(escape(atob(str.replace(/-/g, "+").replace(/_/g, "/"))));
+function shareLink() {
+  const legs = state.legs.filter((l) => l.on).map((l) => [l.player, l.text, l.odds, l.team, l.opp, l.id, l.l5, l.l5n, l.all, l.n]);
+  const data = { w: state.who, d: ymd(new Date()), s: state.stake, l: legs };
+  return `${location.origin}${location.pathname}#p=${b64(JSON.stringify(data))}`;
+}
+function importLink() {
+  const m = location.hash.match(/#p=([\w-]+)/);
+  if (!m) return null;
+  history.replaceState(null, "", location.pathname);
+  try {
+    const data = JSON.parse(unb64(m[1]));
+    if (!TEAMS[data.w] || !Array.isArray(data.l)) return null;
+    const legs = data.l.map(([player, text, odds, team, opp, id, l5, l5n, all, n]) =>
+      ({ id, pid: String(id).split("|")[0], player, text, odds, dec: dec(odds), team, opp, alt: /\+ /.test(text), stat: String(id).split("|")[1], l5, l5n, all, n, on: true }));
+    store.set(`slip.${data.w}`, JSON.stringify({ legs, at: Date.now(), shared: 1, day: data.d }));
+    return data.w;
+  } catch { return null; }
 }
 
 function inSlip(id) { return state.legs.some((l) => l.id === id); }
@@ -305,11 +341,13 @@ function renderBoard() {
 }
 
 function renderParlay() {
+  saveSlip();
+  renderWho();
   const on = state.legs.filter((l) => l.on);
   const d = on.reduce((t, l) => t * l.dec, 1);
   $("parlay").innerHTML = state.legs.length ? `
     <div class="card slip">
-      <h2>${state.who}'s parlay · ${on.length} legs</h2>
+      <h2>${state.who}'s picks · ${on.length} legs</h2>
       ${state.legs.map((l, i) => `
         <label class="leg ${l.on ? "" : "off"}"><input type="checkbox" data-leg="${i}" ${l.on ? "checked" : ""}>
           <span class="main"><b>${esc(l.player)}</b> ${l.text}${l.alt ? " 🪜" : ""}<small>${l.team} vs ${l.opp} · ${l.n ? `${l.l5}/${l.l5n} last 5 · ${l.all}/${l.n} season` : "no recent games"}</small></span>
@@ -317,7 +355,7 @@ function renderParlay() {
       <div class="pay"><label>Stake $<input id="stake" type="number" inputmode="decimal" min="1" value="${state.stake}"></label>
         <span>${on.length ? american(d) : "–"} · pays <b>${money(state.stake * d)}</b></span></div>
       <p class="note">Tap any prop below to add or remove it. Same-game legs get repriced by the book, so the real payout is usually a bit lower.</p>
-      <div class="row"><button id="copy">📋 Copy picks</button><button id="clear">Clear</button></div>
+      <div class="row"><button id="share">📤 Share picks</button><button id="copy">📋 Copy</button><button id="clear">Clear</button></div>
     </div>` : "";
 }
 
@@ -325,7 +363,7 @@ function renderAll() { renderWho(); renderStatus(); renderParlay(); renderBoard(
 
 async function load() {
   const who = state.who;
-  state.board = []; state.legs = [];
+  state.board = []; state.legs = loadSlip(who).legs;
   renderAll();
   if (!who) return;
   try {
@@ -368,6 +406,11 @@ document.addEventListener("click", (e) => {
   } else if (t.id === "clear") {
     state.legs = [];
     renderParlay(); renderBoard();
+  } else if (t.id === "share") {
+    const url = shareLink();
+    const text = `${state.who}'s picks:\n${state.legs.filter((l) => l.on).map((l) => `${l.player} ${l.text}`).join("\n")}\n${url}`;
+    if (navigator.share) navigator.share({ title: `${state.who}'s picks`, text }).catch(() => {});
+    else navigator.clipboard?.writeText(text).then(() => { t.textContent = "Link copied ✓"; }, () => {});
   } else if (t.id === "copy") {
     const text = state.legs.filter((l) => l.on).map((l) => `${l.player} ${l.text}`).join("\n");
     navigator.clipboard?.writeText(text).then(() => { t.textContent = "Copied ✓"; }, () => { t.textContent = "Couldn't copy"; });
@@ -383,6 +426,8 @@ document.addEventListener("change", (e) => {
 });
 
 (async function start() {
+  const from = importLink();
+  if (from) { state.who = from; store.set("who", from); }
   renderWho();
   $("status").textContent = "Loading today's games…";
   try {

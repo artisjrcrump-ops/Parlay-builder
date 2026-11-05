@@ -47,3 +47,4 @@ summary .cnt { margin-left: auto; color: var(--gold); font-size: 13px; }
 .opt.in small { color: #e6edff; }
 .x { padding: 4px 8px; border: 0; background: none; color: var(--muted); font-size: 16px; }
 .slip { border-color: var(--accent); }
+.pill { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--gold); color: #111; font-size: 12px; }
