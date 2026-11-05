@@ -546,3 +546,6 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .plus-block { border-left: 3px solid var(--line); padding: 4px 0 4px 10px; margin: 8px 0; }
 .bank-now { display: flex; align-items: center; gap: 6px; margin: 8px 0 2px; }
 .lines-pick { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.degen-bar { margin-top: 8px; }
+.degen-bar[hidden] { display: none; }
+.degen-note { margin: 4px 0 10px; }

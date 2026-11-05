@@ -151,6 +151,7 @@ function stakeLabel() {
 // yourWay: also allow custom lines FanDuel doesn't post (same-game parlays only).
 async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
   if (/out|doubtful/i.test(p.injury || "")) return [];
+  if (!degenAllows(g[p.side].abbr)) return []; // Degen mode: only the group's teams
   const lines = await getPlayerLines(g, p.name, p.id);
   if (!lines || !Object.keys(lines).length) return [];
   const { rows, season } = await loadGameLog(p.id);
@@ -241,6 +242,7 @@ async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
       });
     }
   }
+  if (degenOn()) out.forEach((c) => { c.owner = degenOwner(team.abbr); });
   return out;
 }
 
@@ -334,6 +336,7 @@ function reason(l) {
   if (l.priceSource === "estimated" && !l.bank) bits.push("YourWay line, price estimated");
   if (l.matchup) bits.push(l.matchup);
   if (l.injury) bits.push(l.injury);
+  if (l.owner) bits.push(`🎲 ${l.owner}'s team`);
   return bits.join(" · ");
 }
 

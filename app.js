@@ -186,9 +186,13 @@ function finalRow(g) {
 }
 
 function renderBoard(games) {
-  const active = games.filter((g) => g.state !== "post");
-  const done = games.filter((g) => g.state === "post");
-  $("games").innerHTML = active.map(gameCard).join("")
+  if (typeof renderDegenBar === "function") renderDegenBar();
+  const degen = typeof degenOn === "function" && degenOn();
+  const shown = degen ? games.filter(degenGame) : games;
+  const active = shown.filter((g) => g.state !== "post");
+  const done = shown.filter((g) => g.state === "post");
+  $("games").innerHTML = (degen ? `<p class="note degen-note">🎲 Degen mode: ${active.length} game${active.length === 1 ? "" : "s"} with your group's teams left${shown.length < games.length ? ` (${games.length - shown.length} hidden)` : ""}. Only players on those teams count.</p>` : "")
+    + active.map(gameCard).join("")
     + (done.length ? `<details class="finals" ${active.length ? "" : "open"}><summary>Final scores (${done.length})</summary>${done.map(finalRow).join("")}</details>` : "");
 }
 

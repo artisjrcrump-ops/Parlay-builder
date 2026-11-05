@@ -90,6 +90,11 @@ function cheatLists(cands) {
   const now = Date.now();
   const rows = Object.values(CHEAT).filter((c) => {
     const any = c.form || c.vs || c.alt || c.alt90;
+    // Degen mode (NBA): only the group's teams, even for entries scored before it was turned on.
+    if (any && any.league === "nba" && degenPick() !== "off") {
+      const owner = degenOwner(any.team);
+      if (!owner || (degenPick() !== "all" && owner !== degenPick())) return false;
+    }
     return any && (games.size ? games.has(any.gameId) : true) && new Date(any.date).getTime() > now - 3 * 3600e3;
   });
   const pick = (kind, order) => {
