@@ -35,3 +35,14 @@ A phone-first web app for building player-prop parlays.
 
 ## Running
 It's a static site with no build step. Open `index.html` through any web server, or use the GitHub Pages link.
+
+## Degen Parlays (separate app for the group)
+
+`degen/` is a small standalone NBA app for Artis, Kevin and AJ: https://artisjrcrump-ops.github.io/Parlay-builder/degen/
+(personal links: add `?me=Artis`, `?me=Kevin` or `?me=AJ`).
+
+- Each person only sees and picks props for their own 6 teams. Other tabs are view-only.
+- Every DraftKings prop (main over and X+ alt rungs, from ESPN's free odds feed) with last-5 and season hit rates; ⭐ marks recommended picks.
+- Offense and defense ranks (points scored / allowed) for each matchup.
+- "Share picks" posts to a free ntfy.sh topic (kept 12 hours); "Update" pulls everyone's latest.
+- Add to Home Screen works (manifest + icons).

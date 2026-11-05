@@ -515,6 +515,9 @@ async function update(btn) {
 (async function start() {
   const from = importLink();
   if (from) { state.who = from; store.set("who", from); }
+  const asked = new URLSearchParams(location.search).get("me"); // personal link, e.g. ?me=Kevin
+  const name = Object.keys(TEAMS).find((w) => w.toLowerCase() === (asked || "").toLowerCase());
+  if (name && !state.me) { state.me = name; store.set("me", name); state.who = name; }
   if (!state.me) state.who = "";
   renderWho();
   $("status").textContent = "Loading today's games…";
