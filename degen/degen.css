@@ -48,3 +48,5 @@ summary .cnt { margin-left: auto; color: var(--gold); font-size: 13px; }
 .x { padding: 4px 8px; border: 0; background: none; color: var(--muted); font-size: 16px; }
 .slip { border-color: var(--accent); }
 .pill { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--gold); color: #111; font-size: 12px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#update { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--accent); background: none; color: var(--accent); font: inherit; font-weight: 700; }

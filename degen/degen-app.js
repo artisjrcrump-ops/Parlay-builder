@@ -385,6 +385,8 @@ document.addEventListener("click", (e) => {
     state.who = t.dataset.who;
     store.set("who", state.who);
     load();
+  } else if (t.id === "update") {
+    update(t);
   } else if (t.id === "build") {
     state.legs = buildParlay(topPicks());
     if (!state.legs.length) $("status").textContent = "No ⭐ picks yet today. Tap props below to make your own.";
@@ -424,6 +426,14 @@ document.addEventListener("change", (e) => {
     if (v > 0) { state.stake = v; store.set("stake", String(v)); renderParlay(); }
   }
 });
+
+// Update: fresh games, lines and everyone's latest picks.
+async function update(btn) {
+  btn.disabled = true; btn.textContent = "Updating…";
+  try { state.games = await loadGames(); } catch { /* keep what we have */ }
+  await load();
+  btn.disabled = false; btn.textContent = "↻ Update";
+}
 
 (async function start() {
   const from = importLink();
