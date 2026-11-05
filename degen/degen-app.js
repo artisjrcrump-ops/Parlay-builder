@@ -520,8 +520,49 @@ async function pullInbox() {
     }));
 }
 
+// Betting-style questionnaire for Kevin and AJ. Shows from 1pm ET on Nov 5, 2026; answers go to Artis's inbox.
+const SURVEY = {
+  for: ["Kevin", "AJ"],
+  opens: Date.UTC(2026, 10, 5, 18, 0), // 1:00 PM Eastern
+  questions: [
+    { id: "first", q: "What do you look at first before you bet a player?", type: "multi", options: ["Last 5 games", "Season average", "Opponent defense", "The odds / price", "Minutes and injuries", "Home or away", "Vs this team before", "Gut feeling"] },
+    { id: "games", q: "How many recent games do you trust most?", type: "one", options: ["Last 3", "Last 5", "Last 10", "Whole season"] },
+    { id: "types", q: "Which bets do you like most?", type: "multi", options: ["Player overs", "Player unders", "Alt lines (X+)", "Moneyline", "Spread", "Game over/under", "Double-doubles", "Threes"] },
+    { id: "price", q: "Shortest odds you'll take on one leg?", type: "one", options: ["-150", "-200", "-300", "-500", "Any price"] },
+    { id: "legs", q: "How many legs in your ideal parlay?", type: "one", options: ["2-3", "4-5", "6-8", "9+"] },
+    { id: "stake", q: "Usual stake and payout you aim for?", type: "text", placeholder: "e.g. $10 to win $500" },
+    { id: "skip", q: "What makes you skip a player or a bet?", type: "text", placeholder: "e.g. back-to-back, coming off injury, tough defense" },
+    { id: "wish", q: "What should this app do better?", type: "text", placeholder: "Anything" },
+  ],
+};
+const surveyDue = () => SURVEY.for.includes(state.me) && Date.now() >= SURVEY.opens && store.get(`survey.${state.me}`, "") !== "done"
+  && store.get("survey.later", "") !== ymd(new Date());
+
+function renderSurvey() {
+  if (!surveyDue()) { $("survey").innerHTML = ""; return; }
+  $("survey").innerHTML = `<div class="card survey">
+    <h2>📝 Quick questions, ${state.me}</h2>
+    <p class="note">How do you pick your bets? Takes about a minute and helps make the picks smarter. Answers go to Artis.</p>
+    ${SURVEY.questions.map((x) => `<div class="q"><b>${x.q}</b>
+      ${x.type === "text" ? `<textarea data-q="${x.id}" rows="2" maxlength="500" placeholder="${esc(x.placeholder || "")}"></textarea>`
+        : `<div class="chips">${x.options.map((o) => `<label><input type="${x.type === "one" ? "radio" : "checkbox"}" name="q-${x.id}" value="${esc(o)}"><span>${esc(o)}</span></label>`).join("")}</div>`}
+    </div>`).join("")}
+    <div class="row"><button id="survey-send">Send answers</button><button id="survey-later">Later</button></div>
+  </div>`;
+}
+
+function surveyText() {
+  return SURVEY.questions.map((x) => {
+    const a = x.type === "text"
+      ? document.querySelector(`[data-q="${x.id}"]`)?.value.trim()
+      : [...document.querySelectorAll(`[name="q-${x.id}"]:checked`)].map((i) => i.value).join(", ");
+    return `${x.q}\n→ ${a || "(skipped)"}`;
+  }).join("\n\n");
+}
+
 function renderAll() {
   renderIdeas();
+  renderSurvey();
   renderWho(); renderStatus(); renderParlay(); renderBoard();
   $("build").hidden = !isMine() || !state.board.some((t) => t.players.length);
   $("me").innerHTML = state.me ? `You're ${state.me}. You can only pick from your own teams. <button id="notme" class="link">Not ${state.me}?</button>` : "";
@@ -562,6 +603,14 @@ document.addEventListener("click", (e) => {
   } else if (t.dataset.view) {
     state.view = t.dataset.view; store.set("view", state.view);
     renderBoard();
+  } else if (t.id === "survey-send") {
+    t.disabled = true; t.textContent = "Sending…";
+    fetch(`https://ntfy.sh/${INBOX.Artis}`, { method: "POST", headers: { Title: `Questionnaire from ${state.me}` }, body: surveyText() })
+      .then((r) => { if (!r.ok) throw new Error(); store.set(`survey.${state.me}`, "done"); $("survey").innerHTML = `<div class="card"><p>Thanks, ${state.me}! Sent ✓</p></div>`; },
+        () => { t.disabled = false; t.textContent = "Couldn't send. Try again"; });
+  } else if (t.id === "survey-later") {
+    store.set("survey.later", ymd(new Date()));
+    renderSurvey();
   } else if (t.id === "idea-send") {
     const box = $("idea-text");
     const to = $("idea-to").value;
