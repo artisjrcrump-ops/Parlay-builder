@@ -18,8 +18,13 @@ const STANDINGS = "https://site.api.espn.com/apis/v2/sports/basketball/nba/stand
 // Shared picks board: a free ntfy.sh topic (no account). Each "Share picks" posts that
 // person's picks there; Update reads the latest per person. ntfy keeps posts for 12 hours.
 const SYNC = "https://ntfy.sh/degen-parlays-82ef139de2c7";
-// Suggestions go to Artis's phone as a push notification (he subscribes to this topic in the free ntfy app).
-const IDEAS = "https://ntfy.sh/degen-ideas-89d092a82a3d";
+// Suggestions: each person has their own inbox topic on ntfy.sh (free). A note goes to one person only.
+// Subscribing to your topic in the free ntfy app turns notes into phone notifications.
+const INBOX = {
+  Artis: "degen-ideas-89d092a82a3d",
+  Kevin: "degen-ideas-d8a0beefee6e",
+  AJ: "degen-ideas-d6cbecb781fc",
+};
 
 const MIN_LEGS = 6;
 const MAX_LEGS = 8;
@@ -488,7 +493,35 @@ function renderParlay() {
 // After any change to my picks: save them, then redraw.
 function changed() { saveSlip(); renderParlay(); renderBoard(); }
 
+// Suggestions card: who to send to, plus notes sent to me in the last day.
+function renderIdeas() {
+  const others = Object.keys(TEAMS).filter((w) => w !== state.me);
+  const sel = $("idea-to");
+  const keep = sel.value;
+  sel.innerHTML = others.map((w) => `<option ${w === keep ? "selected" : ""}>${w}</option>`).join("");
+  $("idea-hint").textContent = state.me ? "Only the person you pick will see it." : "Tap your name at the top first.";
+  const notes = state.inbox || [];
+  $("inbox").innerHTML = !state.me ? "" : `
+    <h3>📬 Sent to you${notes.length ? ` (${notes.length})` : ""}</h3>
+    ${notes.length ? notes.map((n) => `<div class="msg"><small>${esc(n.from)} · ${n.when}</small>${esc(n.text)}</div>`).join("") : `<p class="note">Nothing in the last day.</p>`}
+    <p class="note">Get these as phone notifications: install the free ntfy app and subscribe to <code>${INBOX[state.me]}</code>.</p>`;
+}
+
+async function pullInbox() {
+  if (!state.me) { state.inbox = []; return; }
+  const text = await fetch(`https://ntfy.sh/${INBOX[state.me]}/json?poll=1&since=24h`).then((r) => (r.ok ? r.text() : ""));
+  state.inbox = text.split("\n").map((line) => { try { return JSON.parse(line); } catch { return null; } })
+    .filter((m) => m && m.event === "message")
+    .sort((a, b) => b.time - a.time)
+    .map((m) => ({
+      from: (m.title || "").replace(/^(Suggestion|Degen idea) from /, "") || "Someone",
+      when: new Date(m.time * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }),
+      text: m.message,
+    }));
+}
+
 function renderAll() {
+  renderIdeas();
   renderWho(); renderStatus(); renderParlay(); renderBoard();
   $("build").hidden = !isMine() || !state.board.some((t) => t.players.length);
   $("me").innerHTML = state.me ? `You're ${state.me}. You can only pick from your own teams. <button id="notme" class="link">Not ${state.me}?</button>` : "";
@@ -499,7 +532,7 @@ async function load() {
   state.board = []; state.legs = loadSlip(who).legs;
   renderAll();
   if (!who) return;
-  await pullPicks().catch(() => []);
+  await Promise.all([pullPicks().catch(() => []), pullInbox().catch(() => {})]);
   if (state.who !== who) return;
   if (!isMine()) { renderAll(); return; } // other people's tabs only show their shared picks
   state.legs = loadSlip(who).legs;
@@ -531,11 +564,12 @@ document.addEventListener("click", (e) => {
     renderBoard();
   } else if (t.id === "idea-send") {
     const box = $("idea-text");
+    const to = $("idea-to").value;
     const text = box.value.trim();
-    if (!text) return;
+    if (!text || !INBOX[to]) return;
     t.disabled = true; t.textContent = "Sending…";
-    fetch(IDEAS, { method: "POST", headers: { Title: `Degen idea from ${state.me || "someone"}` }, body: text })
-      .then((r) => { if (!r.ok) throw new Error(); box.value = ""; t.textContent = "Sent to Artis ✓"; },
+    fetch(`https://ntfy.sh/${INBOX[to]}`, { method: "POST", headers: { Title: `Suggestion from ${state.me || "someone"}` }, body: text })
+      .then((r) => { if (!r.ok) throw new Error(); box.value = ""; t.textContent = `Sent to ${to} ✓`; },
         () => { t.textContent = "Couldn't send. Try again"; })
       .finally(() => { t.disabled = false; setTimeout(() => { t.textContent = "Send"; }, 3000); });
   } else if (t.id === "notme") {
