@@ -538,6 +538,13 @@ document.addEventListener("change", (e) => {
 // Update: fresh games, lines and everyone's latest picks.
 async function update(btn) {
   btn.disabled = true; btn.textContent = "Updating…";
+  // New version of the app posted? Reload to get it (picks are saved on the phone).
+  try {
+    const html = await fetch(`index.html?r=${Date.now()}`, { cache: "no-store" }).then((r) => r.text());
+    const live = html.match(/degen-app\.js\?v=(\d+)/)?.[1];
+    const mine = document.querySelector('script[src*="degen-app.js"]')?.src.match(/v=(\d+)/)?.[1];
+    if (live && mine && live !== mine) { location.replace(`./?v=${live}`); return; }
+  } catch { /* offline: just refresh the data */ }
   try { state.games = await loadGames(); } catch { /* keep what we have */ }
   await load();
   btn.disabled = false; btn.textContent = "↻ Update";
