@@ -214,7 +214,7 @@ async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
     if (key === "anytimeTd") {
       const h = hits(rows, statKey, "over", 0.5);
       // No posted price (some feeds post TD scorers without odds): estimate from how often he scores.
-      const guess = h.n ? Math.min(0.85, Math.max(0.15, (h.all / h.n) * 0.85)) * 1.07 : 0;
+      const guess = h.n ? Math.min(0.65, Math.max(0.15, (h.all / h.n) * 0.75)) * 1.07 : 0; // books rarely go past about -250 on a TD
       const odds = l.over ?? (guess ? american(1 / guess) : null);
       const dec = decimal(odds);
       if (h.n >= 4 && h.all / h.n >= 0.5 && dec && dec <= 2.6) {
