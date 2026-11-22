@@ -189,6 +189,11 @@ let LINE_SOURCE = "FanDuel";
 async function getPlayerLines(game, playerName, playerId) {
   // Default: free DraftKings lines (no limit). FanDuel via the key only when turned on in
   // Settings, or when DraftKings has nothing for this player (e.g. some college games).
+  // Real FanDuel/DraftKings prices from PropLine when Artis's Worker is set up (propline.js).
+  if (typeof plUrl === "function" && plUrl()) {
+    const pl = await propLinePlayerLines(game, playerName).catch(() => null);
+    if (pl) return pl;
+  }
   const fdFirst = loadPref("lines", "dk") === "fd";
   if (!fdFirst) {
     const all = await espnGameLines(game).catch(() => ({}));
@@ -259,6 +264,14 @@ function openSettings() {
   const has = !!oddsKey();
   $("sheet-body").innerHTML = `
     <div class="settings">
+      <label for="pl-url">Real odds (PropLine Worker)</label>
+      <input id="pl-url" type="url" autocomplete="off" placeholder="https://propline.yourname.workers.dev" value="${plUrl()}">
+      <div class="settings-actions">
+        <button id="pl-save" class="btn primary">Save</button>
+        <button id="pl-test" class="btn">Test</button>
+        <button id="pl-refresh" class="btn">↻ Prices now</button>
+      </div>
+      <p id="pl-msg" class="note">${plUrl() ? (PL_STATUS || "Set up. FanDuel prices load when you open a game or build parlays.") : "Not set up yet. Steps: <a href=\"https://github.com/artisjrcrump-ops/Parlay-builder/blob/main/worker/SETUP.md\" target=\"_blank\" rel=\"noopener\">setup guide</a>."}</p>
       <label for="sgo-key">SportsGameOdds API key</label>
       <input id="sgo-key" type="password" autocomplete="off" placeholder="Paste your key" value="${has ? "••••••••" : ""}">
       <div class="settings-actions">
@@ -289,7 +302,27 @@ $("sheet-body").addEventListener("change", (e) => {
   sheet.autoCache = null;
 });
 
-$("sheet-body").addEventListener("click", (e) => {
+$("sheet-body").addEventListener("click", async (e) => {
+  if (e.target.id === "pl-save") {
+    const v = $("pl-url").value.trim();
+    if (v && !/^https:\/\/[\w.-]+\.workers\.dev\/?$/.test(v)) { $("pl-msg").textContent = "That doesn't look like a workers.dev address."; return; }
+    savePref("propline", v);
+    plRefresh(); sheet.sportCache = {}; sheet.autoCache = null;
+    $("pl-msg").textContent = v ? "Saved. Tap Test to check it." : "Removed.";
+    return;
+  }
+  if (e.target.id === "pl-test" || e.target.id === "pl-refresh") {
+    plRefresh(); sheet.sportCache = {}; sheet.autoCache = null;
+    $("pl-msg").textContent = "Checking…";
+    try {
+      const evs = await plSlate(state.league, true);
+      const n = evs ? evs.filter((ev) => Object.keys(ev.books).length).length : 0;
+      $("pl-msg").textContent = evs ? `${PL_STATUS}. ${n} ${LEAGUES[state.league].label} games with prices.` : "Paste your Worker address first.";
+    } catch (err) {
+      $("pl-msg").textContent = `Couldn't reach it (${err.message}). Check the address and that PROPLINE_KEY is saved in Cloudflare.`;
+    }
+    return;
+  }
   if (e.target.id === "sgo-save") {
     const v = $("sgo-key").value.trim();
     if (!v || v === "••••••••") return;

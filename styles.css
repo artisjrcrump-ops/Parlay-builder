@@ -549,3 +549,7 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .degen-bar { margin-top: 8px; }
 .degen-bar[hidden] { display: none; }
 .degen-note { margin: 4px 0 10px; }
+.real-price { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line, #2a2f3a); }
+.real-price label { display: block; margin-bottom: 6px; }
+.real-price input#real-odds { width: 110px; margin-left: 6px; }
+.shot-btn { display: inline-block; margin-top: 6px; cursor: pointer; }

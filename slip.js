@@ -155,7 +155,7 @@ function renderSlip() {
         <div><button class="copy-name" data-copy-leg="${l.id}"><b>${l.player}</b> ${legText(l)} ⧉</button></div>
         <small>${l.team} vs ${l.opp} · ${l.est != null ? `est ${l.est} · ` : ""}L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
       </div>
-      <span class="leg-odds">${l.odds}</span>
+      <span class="leg-odds">${l.priceSource === "FanDuel (screenshot)" ? "📷 " : ""}${l.odds}</span>
       <button class="leg-x" data-remove-leg="${l.id}" aria-label="Remove leg">✕</button>
     </div>`).join("");
 
@@ -168,10 +168,11 @@ function renderSlip() {
     <div class="slip-sum">
       <label>Stake $<input id="stake" type="number" inputmode="decimal" min="1" step="1" value="${slip.stake}"></label>
       <div class="slip-odds">${m.on.length} legs · ${american(m.dec)}</div>
-      <div class="slip-pay ${inRange ? "in" : "out"}">Pays ${money(m.payout)}</div>
+      <div class="slip-pay ${inRange ? "in" : "out"}">Pays ${money(m.payout)} <small class="muted">(straight math)</small></div>
+      ${typeof realPriceHtml === "function" ? realPriceHtml(m) : ""}
       <p class="note">Your target is ${money(TARGET.low)}–${money(TARGET.high)}. Stake for ${money(TARGET.low)}: ${stakeFor(TARGET.low)} · for ${money(TARGET.high)}: ${stakeFor(TARGET.high)}.</p>
       ${m.sameGame ? `<p class="warn">Some legs are from the same game. FanDuel reprices same-game parlays, so the real payout will usually be lower than this.</p>` : ""}
-      <p class="note">Odds are FanDuel's standard lines. YourWay lines you move in FanDuel will change the price.</p>
+      <p class="note">Leg prices come from ${typeof LINE_SOURCE !== "undefined" ? LINE_SOURCE : "the book"}; ~ means estimated. Legs marked 📷 were read from your FanDuel screenshot.</p>
     </div>
     ${placeButtons(m.on)}
     <div class="settings-actions">
@@ -222,6 +223,8 @@ $("sheet-body").addEventListener("click", (e) => {
     slip.justSaved = true;
   } else if (t.id === "slip-clear") {
     slip.legs = [];
+    slip.real = null;
+    savePref("slipReal", "");
   } else {
     return;
   }
