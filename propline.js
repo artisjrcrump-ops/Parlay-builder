@@ -68,7 +68,8 @@ function parsePropLine(data) {
           if (!who || !Number.isFinite(price)) continue;
           const p = (players[who] ||= {});
           if (yes) {
-            if (/^(yes|over)$/i.test(o.name || "") && !p[yes.key]) p[yes.key] = { ...yes, over: price, under: null, yes: true };
+            // the "yes" side is named Yes/Over, or just the player's name (FanDuel's anytime TD)
+            if (!/^(no|under)$/i.test(o.name || "") && !p[yes.key]) p[yes.key] = { ...yes, over: price, under: null, yes: true };
             continue;
           }
           const s = (p[stat] ||= { line: NaN, over: null, under: null, alts: {} });
