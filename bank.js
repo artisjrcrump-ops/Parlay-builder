@@ -171,8 +171,8 @@ $("sheet-body").addEventListener("click", (e) => {
     if (!p) return;
     // The slip becomes this bet: both picks, staked with the whole bank.
     slip.legs = p.legs.map((c) => {
-      const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season } = c;
-      return { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes: false, group: `Bank builder · bet ${l.step}`, on: true };
+      const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est, l5, season } = c;
+      return { id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est, l5, season, yes: false, group: `Bank builder · bet ${l.step}`, on: true };
     });
     slip.stake = Math.round(l.bank * 100) / 100;
     savePref("stake", String(slip.stake));

@@ -102,8 +102,8 @@ $("sheet-body").addEventListener("click", (e) => {
       if (which !== "all") slip.legs.splice(i, 1); // tap again to take it back out
       continue;
     }
-    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes, thr } = l;
-    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes, thr, group: "Hottest 10", on: true });
+    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est, l5, season, yes, thr } = l;
+    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est, l5, season, yes, thr, group: "Hottest 10", on: true });
   }
   persist();
   renderHottest(sheet.hotPicks);

@@ -117,9 +117,9 @@ $("sheet-body").addEventListener("click", (e) => {
   const t = sheet.ladder[+b.dataset.ladderUse];
   for (const c of t?.legs || []) {
     if (slip.legs.some((x) => x.id === c.id)) continue;
-    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, l5, season, thr, yes } = c;
+    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, l5, season, thr, yes } = c;
     const group = { sgp: "Same-game ladder", multi: "One per game", fbplus: "Football SGP+" }[t.kind];
-    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est: null, l5, season, thr: yes ? undefined : thr, yes: !!yes, group, on: true });
+    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est: null, l5, season, thr: yes ? undefined : thr, yes: !!yes, group, on: true });
   }
   persist();
   b.textContent = "Added ✓";

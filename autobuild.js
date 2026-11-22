@@ -551,8 +551,8 @@ $("sheet-body").addEventListener("click", (e) => {
   for (const p of chosen) {
     for (const l of p.legs) {
       if (slip.legs.some((x) => x.id === l.id)) continue;
-      const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes } = l;
-      slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes, group: p.name, on: true });
+      const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est, l5, season, yes } = l;
+      slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est, l5, season, yes, group: p.name, on: true });
     }
   }
   persist();

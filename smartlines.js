@@ -235,8 +235,8 @@ $("sheet-body").addEventListener("click", (e) => {
   } else if (d.smartAdd !== undefined) {
     for (const c of smartSummary(sheet.smart.pool, sheet.smart.on).legs) {
       if (slip.legs.some((x) => x.id === c.id)) continue;
-      const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season } = c;
-      slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes: false,
+      const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est, l5, season } = c;
+      slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est, l5, season, yes: false,
         group: c.priceSource === "estimated" ? "Best lines · check price" : "Best lines", on: true });
     }
     persist();

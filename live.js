@@ -225,8 +225,8 @@ updateLiveButton();
 
 function addLiveLeg(c, group) {
   if (slip.legs.some((x) => x.id === c.id)) return;
-  const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season } = c;
-  slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est, l5, season, yes: false, group, on: true });
+  const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est, l5, season } = c;
+  slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, statKey, source, league, side, line, odds, est, l5, season, yes: false, live: true, group, on: true });
 }
 
 $("sheet-body").addEventListener("click", (e) => {

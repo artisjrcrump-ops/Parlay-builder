@@ -66,7 +66,7 @@ function propPicker({ player, playerId, team, opp, game, stats, lines, estimate,
       candidates[id] = {
         id, player, team, opp, gameId: game.id, date: game.date.toISOString(),
         stat: s.label, side, line: l.line, odds, est: Math.round(est * 10) / 10, yes: !!l.yes,
-        playerId, gradeKey: s.statKey, league: state.league,
+        playerId, gradeKey: s.statKey, statKey: s.key, source: typeof LINE_SOURCE !== "undefined" ? LINE_SOURCE : "", league: state.league,
         l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`, on: true,
       };
       const inSlip = slip.legs.some((x) => x.id === id);
@@ -129,6 +129,47 @@ function openSlip() {
   persist(); // picks up bet-slip links loaded since these legs were added
   renderSlip();
   openSheet();
+  repriceSlip().then((n) => { if (n && $("sheet-title").textContent === "Your slip") renderSlip(); });
+}
+
+// A leg's game already started (or is over): its price is from back then.
+// (2nd-half legs are added mid-game on purpose, so they only go stale hours later.)
+const legStarted = (l) => !!l.date && new Date(l.date).getTime() < Date.now() - (l.live ? 4 * 3600 * 1000 : 0);
+function legWhen(l) {
+  if (!l.date) return "";
+  const d = new Date(l.date);
+  if (legStarted(l)) return `⛔ ${d.toLocaleDateString([], { month: "short", day: "numeric" })} (started) · `;
+  return ymd(d) === ymd(new Date()) ? "" : `${d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} · `;
+}
+
+// Re-price the slip's legs from the book's current lines (PropLine/FanDuel first) for games on
+// the board right now, so a leg added earlier doesn't keep an old or estimated price.
+async function repriceSlip() {
+  const games = Object.fromEntries((state.games || []).map((g) => [String(g.id), g]));
+  let changed = 0;
+  let checked = 0;
+  for (const leg of slip.legs) {
+    const g = games[String(leg.gameId)];
+    if (!g || legStarted(leg) || leg.priceSource === "FanDuel (screenshot)" || leg.league !== state.league) continue;
+    const lines = await getPlayerLines(g, leg.player, leg.playerId).catch(() => null);
+    const key = leg.statKey || leg.gradeKey;
+    const l = lines?.[key] || Object.values(lines || {}).find((x) => x.statKey === key && !!x.yes === !!leg.yes);
+    if (!l) continue;
+    checked++;
+    const line = leg.thr && !leg.yes ? leg.thr - 0.5 : leg.line;
+    const side = leg.side === "under" ? "under" : "over";
+    const price = leg.yes ? l.over : l.line === line ? l[side] : l.alts?.[line]?.[side];
+    if (price == null) continue;
+    const odds = price > 0 ? `+${price}` : `${price}`;
+    if (odds !== String(leg.odds) || leg.priceSource !== LINE_SOURCE) changed++;
+    leg.odds = odds;
+    leg.priceSource = LINE_SOURCE;
+  }
+  if (checked) {
+    slip.repriceNote = `Prices checked against ${LINE_SOURCE} at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}${changed ? ` · ${changed} updated` : ""}.`;
+    persist();
+  }
+  return checked;
 }
 
 // FanDuel/DraftKings bet-slip links from the free feed don't work in New York (they're tied to
@@ -153,14 +194,16 @@ function renderSlip() {
       <button class="leg-toggle" data-toggle-leg="${l.id}" aria-label="Include leg">${l.on ? "✓" : ""}</button>
       <div class="leg-main">
         <div><button class="copy-name" data-copy-leg="${l.id}"><b>${l.player}</b> ${legText(l)} ⧉</button></div>
-        <small>${l.team} vs ${l.opp} · ${l.est != null ? `est ${l.est} · ` : ""}L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
+        <small>${legWhen(l)}${l.team} vs ${l.opp} · ${l.est != null ? `est ${l.est} · ` : ""}L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
       </div>
-      <span class="leg-odds">${l.priceSource === "FanDuel (screenshot)" ? "📷 " : ""}${l.odds}</span>
+      <span class="leg-odds">${l.priceSource === "FanDuel (screenshot)" ? "📷 " : /estimat/i.test(l.priceSource || l.source || "") ? "~" : ""}${l.odds}</span>
       <button class="leg-x" data-remove-leg="${l.id}" aria-label="Remove leg">✕</button>
     </div>`).join("");
 
   const allOn = slip.legs.every((l) => l.on);
   $("sheet-body").innerHTML = slip.legs.length ? `
+    ${slip.repriceNote ? `<p class="note">${slip.repriceNote}</p>` : ""}
+    ${slip.legs.some(legStarted) ? `<p class="warn">Some legs are for games that already started or finished (marked ⛔). Their prices are old. <button class="btn" data-remove-old>Remove old legs</button></p>` : ""}
     <div class="settings-actions top-actions">
       <button class="btn" data-check-all="${allOn ? "off" : "on"}">${allOn ? "Uncheck all" : "Check all"}</button>
     </div>
@@ -210,6 +253,8 @@ $("sheet-body").addEventListener("click", (e) => {
   } else if (d.toggleLeg) {
     const leg = slip.legs.find((x) => x.id === d.toggleLeg);
     if (leg) leg.on = !leg.on;
+  } else if ("removeOld" in d) {
+    slip.legs = slip.legs.filter((x) => !legStarted(x));
   } else if (d.removeLeg) {
     slip.legs = slip.legs.filter((x) => x.id !== d.removeLeg);
   } else if (t.id === "slip-save") {
