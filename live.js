@@ -15,6 +15,18 @@ const LIVE_STATS = {
 const LIVE_LABEL = { points: "PTS", totalRebounds: "REB", assists: "AST", threes: "3PM", pra: "PRA",
   passingYards: "Pass Yds", rushingYards: "Rush Yds", receivingYards: "Rec Yds", receptions: "Rec" };
 
+// Fouls: 6 to foul out in the NBA, 5 in college. "Trouble" = 2 away from fouling out, or
+// 3 away with half the game still to play; coaches sit those players, so fewer minutes.
+const FOUL_OUT = { nba: 6, ncaab: 5 };
+function foulInfo(league, fouls, left) {
+  const max = FOUL_OUT[league];
+  if (!max) return null;
+  const f = fouls || 0;
+  const out = f >= max;
+  const trouble = !out && (f >= max - 2 || (f >= max - 3 && left >= 0.45));
+  return { f, max, out, trouble };
+}
+
 function clockMinutes(text) {
   const [m, s] = String(text || "0").split(":");
   return s == null ? parseFloat(m) / 60 || 0 : (parseFloat(m) || 0) + (parseFloat(s) || 0) / 60;
@@ -55,7 +67,7 @@ function liveBox(summary) {
 }
 
 // Projected final for one stat, with a spread for the chance math.
-async function projectStat(league, playerId, live, key, left, blowoutRole) {
+async function projectStat(league, playerId, live, key, left, blowoutRole, minutesFactor = 1) {
   const { rows } = await loadGameLog(playerId, league).catch(() => ({ rows: [] }));
   if (rows.length < 3) return null;
   const cur = live.stats[key] || 0;
@@ -70,6 +82,7 @@ async function projectStat(league, playerId, live, key, left, blowoutRole) {
     rem = Math.max(rem, left * avgMin);
     if (blowoutRole === "starter") rem *= 0.5;
     if (blowoutRole === "bench") rem = Math.min(left * n * len, rem * 1.6 + 3);
+    rem *= minutesFactor; // foul trouble
     const more = rate * rem;
     return { cur, proj: cur + more, sd: Math.sqrt(Math.max(more, 0.3)) * 1.15 + 0.4 };
   }
@@ -107,10 +120,12 @@ async function liveLeague(key, progress) {
         const lines = await getPlayerLines(g, p.name, p.id).catch(() => null);
         if (!lines) continue;
         const role = blowout ? (p.starter ? "starter" : "bench") : null;
+        const fouls = foulInfo(key, p.stats.fouls, left);
+        if (fouls?.out) continue; // fouled out: done for the night
         for (const statKey of LIVE_STATS[sportOf(key)]) {
           const l = lines[statKey];
           if (!l || !Number.isFinite(l.line) || !l.over) continue;
-          const pr = await projectStat(key, id, p, statKey, left, role);
+          const pr = await projectStat(key, id, p, statKey, left, role, fouls?.trouble ? 0.75 : 1);
           if (!pr || pr.cur > l.line) continue; // already cashed
           const prob = Math.min(0.95, 1 - phi((l.line - pr.proj) / pr.sd));
           if (prob < 0.6) continue;
@@ -120,7 +135,7 @@ async function liveLeague(key, progress) {
             id: `${g.id}|${p.name}|${LIVE_LABEL[statKey]}|over|live`, player: p.name, playerId: id, sport: lg.label,
             team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(), league: key,
             stat: LIVE_LABEL[statKey], gradeKey: statKey, side: "over", line: l.line, odds: l.over, yes: false,
-            cur: pr.cur, proj: Math.round(pr.proj * 10) / 10, prob, role,
+            cur: pr.cur, proj: Math.round(pr.proj * 10) / 10, prob, role, fouls,
             est: Math.round(pr.proj * 10) / 10, l5: "live", season: "live", on: true,
           });
         }
@@ -158,7 +173,8 @@ function renderLive(games, failed = []) {
   const pickRow = (c) => `
     <div class="auto-leg">
       <div><b>${c.player}</b> ${legText(c)} <span class="muted">${c.sport} · ${c.team} vs ${c.opp}</span><br>
-      <small>has ${c.cur} now · on pace for ${c.proj} · ~${Math.round(c.prob * 100)}% to clear${c.role === "bench" ? " · backup in a blowout" : ""}</small></div>
+      <small>has ${c.cur} now · on pace for ${c.proj} · ~${Math.round(c.prob * 100)}% to clear${c.role === "bench" ? " · backup in a blowout" : ""}</small>
+      ${c.fouls ? `<br><small class="${c.fouls.trouble ? "foul-trouble" : "muted"}">${c.fouls.trouble ? "⚠️ " : ""}${c.fouls.f} foul${c.fouls.f === 1 ? "" : "s"} (out at ${c.fouls.max})${c.fouls.trouble ? " · foul trouble, may sit" : ""}</small>` : ""}</div>
       <button class="pick hot-pick ${inSlip(c) ? "added" : ""}" data-live-add="${c.id}">${c.odds}<br><small>${inSlip(c) ? "Added" : "Add"}</small></button>
     </div>`;
   const setBtn = (key, legs, label) => {
@@ -170,7 +186,7 @@ function renderLive(games, failed = []) {
   $("sheet-body").innerHTML = `${sportChips()}
     ${failed.length ? `<p class="note">Couldn't load ${failed.join(", ")} right now.</p>` : ""}
     ${games.length ? `
-      <p class="note">A 2nd-half parlay is a same-game parlay unless more than one game hits halftime at the same time, then legs from those games can go together. Projections use what each player has now plus his usual rate for the time left; in a blowout, starters' minutes are cut and backups' go up. Odds shown can lag, so check FanDuel's live lines before you bet.</p>
+      <p class="note">A 2nd-half parlay is a same-game parlay unless more than one game hits halftime at the same time, then legs from those games can go together. Projections use what each player has now plus his usual rate for the time left; in a blowout, starters' minutes are cut and backups' go up. Each player's fouls are shown; ⚠️ foul trouble cuts his projected minutes, and players who fouled out are left off. Odds shown can lag, so check FanDuel's live lines before you bet.</p>
       ${halfGames.length >= 2 && multi.length >= 2 ? `
         <div class="auto">
           <div class="auto-head"><b>🕐 Halftime parlay · ${halfGames.length} games at the half</b></div>
