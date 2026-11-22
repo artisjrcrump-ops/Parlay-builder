@@ -23,7 +23,7 @@ function safeRung({ rows, statKey, l, opp, home }) {
     const strict = statKey === "threes" || (statKey === "totalRebounds" && s.thr >= 10);
     const need = Math.ceil(last10.length * (strict ? 0.9 : 0.8));
     s.l10 = hits; s.l10n = last10.length;
-    return hits >= need && s.l5 >= s.l5n - 1 && s.dec && s.dec >= 1.08 && s.dec <= 1.9;
+    return hits >= need && s.l5 >= s.l5n - 1 && s.dec && s.dec >= 1.2 && s.dec <= 1.9; // about -500 to -110: skip the near-locks that pay nothing
   });
   return ladder.length ? ladder[ladder.length - 1] : null;
 }
