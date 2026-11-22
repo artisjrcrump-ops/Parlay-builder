@@ -175,7 +175,7 @@ function renderFootballPlus(header, cands) {
   sheet.ladder = tickets;
   sheet.autoParlays = null;
   const leg = (c) => c.tdPick
-    ? `<div class="alt-leg"><b>${c.player}</b> <span class="muted">(${c.team})</span> Anytime TD <span class="leg-odds">${c.odds}</span>
+    ? `<div class="alt-leg"><b>${c.player}</b> <span class="muted">(${c.team})</span> Anytime TD <span class="leg-odds">${c.source === "estimated" ? "~" : ""}${c.odds}</span>
        <small class="muted"> · scored in ${c.allHits}/${c.n} games · last 5: ${c.l5Hits}/${c.l5n}</small></div>`
     : ladderLeg(c);
   $("sheet-body").innerHTML = `${header}

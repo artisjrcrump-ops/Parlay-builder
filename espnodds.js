@@ -40,7 +40,7 @@ const espnMem = {};
 // { athleteId: { statKey: { line, over, under, alts: { line: { over } } } } } for one game.
 // One download per game, shared by every player asking at once.
 function espnGameLines(game) {
-  const key = `pb.odds.espn.${game.id}`;
+  const key = `pb.odds.espn2.${game.id}`;
   if (espnMem[key] && Date.now() - espnMem[key].at < 30 * 60 * 1000) return espnMem[key].promise;
   const cached = readCache(key);
   const promise = cached ? Promise.resolve(cached) : fetchEspnLines(game, key);
@@ -64,12 +64,13 @@ async function fetchEspnLines(game, key) {
     const aid = (it.athlete?.$ref || "").match(/athletes\/(\d+)/)?.[1];
     const name = it.type?.name || "";
     if (!aid || /1st|2nd|3rd|4th|Quarter|Half|First /.test(name)) continue;
-    const odds = parseInt(it.odds?.american?.value, 10);
-    if (!Number.isFinite(odds)) continue;
+    // Some feeds (NFL in late Nov 2026) post the lines with no prices: keep the line, price unknown.
+    const raw = parseInt(it.odds?.american?.value ?? it.current?.american?.value, 10);
+    const odds = Number.isFinite(raw) ? raw : null;
     const p = (data[aid] ||= {});
     const yes = ESPN_YES[name];
     if (yes) {
-      if (!p[yes.key]) p[yes.key] = { line: yes.line, over: odds, under: null, statKey: yes.statKey, yes: true, label: yes.label, maxDec: yes.maxDec };
+      if (!p[yes.key]) p[yes.key] = { line: yes.line, over: odds, under: null, statKey: yes.statKey, yes: true, label: yes.label, maxDec: yes.maxDec, noPrice: odds == null };
       continue;
     }
     const base2 = name.replace(/ \(incl\. overtime\)/, "").replace(/ Milestones$/, "");
@@ -78,10 +79,11 @@ async function fetchEspnLines(game, key) {
     const s = (p[stat] ||= { line: NaN, over: null, under: null, alts: {} });
     if (/Milestones$/.test(name)) {
       const thr = parseFloat(it.odds?.total?.value ?? it.current?.target?.value);
-      if (Number.isFinite(thr)) (s.alts[thr - 0.5] ||= {}).over ??= odds;
+      if (Number.isFinite(thr) && odds != null) (s.alts[thr - 0.5] ||= {}).over ??= odds;
       continue;
     }
-    const line = parseFloat(it.odds?.total?.value);
+    const line = parseFloat(it.odds?.total?.value ?? it.current?.target?.value);
+    if (odds == null) s.noPrice = true;
     if (!Number.isFinite(line)) continue;
     const pk = `${aid}|${stat}|${line}`;
     const n = (pairs[pk] = (pairs[pk] || 0) + 1);

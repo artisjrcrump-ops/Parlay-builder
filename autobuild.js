@@ -211,16 +211,19 @@ async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
       });
     }
     // Anytime TD scorer for the football SGP+ (ladder.js): scored in half or more of his games.
-    if (key === "anytimeTd" && l.over) {
+    if (key === "anytimeTd") {
       const h = hits(rows, statKey, "over", 0.5);
-      const dec = decimal(l.over);
+      // No posted price (some feeds post TD scorers without odds): estimate from how often he scores.
+      const guess = h.n ? Math.min(0.85, Math.max(0.15, (h.all / h.n) * 0.85)) * 1.07 : 0;
+      const odds = l.over ?? (guess ? american(1 / guess) : null);
+      const dec = decimal(odds);
       if (h.n >= 4 && h.all / h.n >= 0.5 && dec && dec <= 2.6) {
         out.push({
           id: `${g.id}|${p.name}|Anytime TD|td`, tdPick: true, smart: true,
           player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
           away: g.away.abbr, home: g.home.abbr,
           stat: "Anytime TD", statKey: key, gradeKey: statKey, league: state.league, yes: true,
-          side: "over", line: 0.5, odds: l.over, dec, source: "posted",
+          side: "over", line: 0.5, odds, dec, source: l.over == null ? "estimated" : "posted",
           l5Hits: h.l5, l5n: h.l5n, allHits: h.all, n: h.n, l10Hits: h.all, l10n: h.n,
           l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`, on: true,
         });
