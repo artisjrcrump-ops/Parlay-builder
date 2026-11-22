@@ -196,6 +196,20 @@ async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
         l5: `${at.l5}/${at.l5n}`, season: `${at.all}/${at.n}`, on: true,
       });
     }
+    // Safe X+ rung for the ladder parlays (ladder.js): cleared in 8+ of the last 10.
+    const sr = l.yes ? null : safeRung({ rows, statKey, l, opp: opp.abbr, home: p.side === "home" });
+    if (sr && !(mu?.tough && sr.l10 < sr.l10n)) {
+      out.push({
+        id: `${g.id}|${p.name}|${PROP_LABEL[key] || key}|over|lad${sr.thr}`, ladder: true, smart: true,
+        player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
+        away: g.away.abbr, home: g.home.abbr,
+        stat: PROP_LABEL[key] || key, statKey: key, gradeKey: statKey, league: state.league, yes: false,
+        side: "over", line: sr.line, thr: sr.thr, postedLine: l.line, odds: sr.odds, dec: sr.dec, source: sr.source, priceSource: sr.source,
+        matchup: mu?.soft ? "soft matchup" : "",
+        l10Hits: sr.l10, l10n: sr.l10n, l5Hits: sr.l5, l5n: sr.l5n, allHits: sr.all, n: sr.n,
+        l5: `${sr.l5}/${sr.l5n}`, season: `${sr.all}/${sr.n}`, on: true,
+      });
+    }
     // A short-priced version of this prop for the Bank builder (bank.js).
     const safe = l.yes ? null : smartPick({ rows, statKey, est, l, mu, injury: p.injury, bank: true });
     if (safe) {
@@ -375,11 +389,11 @@ function renderParlays(parlays, opts = {}) {
 
 const AUTO_MODES = {
   basketball: [
-    ["smart", "Best lines pool"], ["altplus", "Alt-line SGP+ (multi-game)"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
+    ["ladder", "Same-game ladder (6-9 X+ legs)"], ["pergame", "One X+ leg per game (8 games)"], ["smart", "Best lines pool"], ["altplus", "Alt-line SGP+ (multi-game)"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["threes", "3-pointers made"], ["totalRebounds", "Rebounds"],
     ["assists", "Assists"], ["points", "Points"], ["pra", "Pts + Reb + Ast"],
   ],
   football: [
-    ["smart", "Best lines pool"], ["altplus", "Alt-line SGP+ (multi-game)"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
+    ["ladder", "Same-game ladder (6-9 X+ legs)"], ["pergame", "One X+ leg per game (8 games)"], ["smart", "Best lines pool"], ["altplus", "Alt-line SGP+ (multi-game)"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
     ["rushingYards", "Rushing yards"], ["receivingYards", "Receiving yards"], ["receptions", "Receptions"],
   ],
 };
@@ -434,12 +448,13 @@ function autoModes(leagues) {
 function renderAuto() {
   const c = sheet.autoAll;
   const modes = autoModes(c.leagues);
-  const mode = modes.some(([k]) => k === sheet.autoMode) ? sheet.autoMode : "smart";
+  const mode = modes.some(([k]) => k === sheet.autoMode) ? sheet.autoMode : "ladder";
   const label = modes.find(([k]) => k === mode)[1];
   const all = withoutSaved(c.cands);
   const header = `${sportChips()}${c.failed.length ? `<p class="note">Couldn't load ${c.failed.join(", ")} right now.</p>` : ""}<label class="mode"><span>Build</span><select id="auto-mode">${modes
     .map(([k, l]) => `<option value="${k}" ${k === mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>${skippedNote(all)}`;
   sheet.smart = null;
+  if (mode === "ladder" || mode === "pergame") return renderLadder(header, all, mode);
   if (mode === "smart") return renderSmart(header, all);
   if (mode === "alt") return renderAltTrends(header, all);
   if (mode === "altplus") return renderAltPlus(header, all);
