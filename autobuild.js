@@ -210,6 +210,22 @@ async function scorePlayer(g, p, totalPct = 0.5, yourWay = false) {
         l5: `${sr.l5}/${sr.l5n}`, season: `${sr.all}/${sr.n}`, on: true,
       });
     }
+    // Anytime TD scorer for the football SGP+ (ladder.js): scored in half or more of his games.
+    if (key === "anytimeTd" && l.over) {
+      const h = hits(rows, statKey, "over", 0.5);
+      const dec = decimal(l.over);
+      if (h.n >= 4 && h.all / h.n >= 0.5 && dec && dec <= 2.6) {
+        out.push({
+          id: `${g.id}|${p.name}|Anytime TD|td`, tdPick: true, smart: true,
+          player: p.name, playerId: p.id, team: team.abbr, opp: opp.abbr, gameId: g.id, date: g.date.toISOString(),
+          away: g.away.abbr, home: g.home.abbr,
+          stat: "Anytime TD", statKey: key, gradeKey: statKey, league: state.league, yes: true,
+          side: "over", line: 0.5, odds: l.over, dec, source: "posted",
+          l5Hits: h.l5, l5n: h.l5n, allHits: h.all, n: h.n, l10Hits: h.all, l10n: h.n,
+          l5: `${h.l5}/${h.l5n}`, season: `${h.all}/${h.n}`, on: true,
+        });
+      }
+    }
     // A short-priced version of this prop for the Bank builder (bank.js).
     const safe = l.yes ? null : smartPick({ rows, statKey, est, l, mu, injury: p.injury, bank: true });
     if (safe) {
@@ -393,7 +409,7 @@ const AUTO_MODES = {
     ["assists", "Assists"], ["points", "Points"], ["pra", "Pts + Reb + Ast"],
   ],
   football: [
-    ["ladder", "Same-game ladder (6-9 X+ legs)"], ["pergame", "One X+ leg per game (8 games)"], ["smart", "Best lines pool"], ["altplus", "Alt-line SGP+ (multi-game)"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
+    ["fbplus", "SGP+: TD + passing + catches (10 legs)"], ["ladder", "Same-game ladder (6-9 X+ legs)"], ["pergame", "One X+ leg per game (8 games)"], ["smart", "Best lines pool"], ["altplus", "Alt-line SGP+ (multi-game)"], ["alt", "Alternate lines (SGP)"], ["mixed", "Mixed: 5 themed parlays"], ["blowout", "Blowout bench overs"], ["anytimeTd", "Anytime TD"], ["passingYards", "Passing yards"],
     ["rushingYards", "Rushing yards"], ["receivingYards", "Receiving yards"], ["receptions", "Receptions"],
   ],
 };
@@ -448,12 +464,13 @@ function autoModes(leagues) {
 function renderAuto() {
   const c = sheet.autoAll;
   const modes = autoModes(c.leagues);
-  const mode = modes.some(([k]) => k === sheet.autoMode) ? sheet.autoMode : "ladder";
+  const mode = modes.some(([k]) => k === sheet.autoMode) ? sheet.autoMode : modes[0][0];
   const label = modes.find(([k]) => k === mode)[1];
   const all = withoutSaved(c.cands);
   const header = `${sportChips()}${c.failed.length ? `<p class="note">Couldn't load ${c.failed.join(", ")} right now.</p>` : ""}<label class="mode"><span>Build</span><select id="auto-mode">${modes
     .map(([k, l]) => `<option value="${k}" ${k === mode ? "selected" : ""}>${l}</option>`).join("")}</select></label>${skippedNote(all)}`;
   sheet.smart = null;
+  if (mode === "fbplus") return renderFootballPlus(header, all);
   if (mode === "ladder" || mode === "pergame") return renderLadder(header, all, mode);
   if (mode === "smart") return renderSmart(header, all);
   if (mode === "alt") return renderAltTrends(header, all);

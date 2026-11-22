@@ -117,10 +117,73 @@ $("sheet-body").addEventListener("click", (e) => {
   const t = sheet.ladder[+b.dataset.ladderUse];
   for (const c of t?.legs || []) {
     if (slip.legs.some((x) => x.id === c.id)) continue;
-    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, l5, season, thr } = c;
-    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est: null, l5, season, thr, yes: false, group: t.kind === "sgp" ? "Same-game ladder" : "One per game", on: true });
+    const { id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, l5, season, thr, yes } = c;
+    const group = { sgp: "Same-game ladder", multi: "One per game", fbplus: "Football SGP+" }[t.kind];
+    slip.legs.push({ id, player, playerId, team, opp, gameId, date, stat, gradeKey, league, side, line, odds, est: null, l5, season, thr: yes ? undefined : thr, yes: !!yes, group, on: true });
   }
   persist();
   b.textContent = "Added ✓";
   b.classList.remove("primary");
 });
+
+// Football SGP+ like Artis's 10-leg college ticket (Nov 7, 2026): 4-5 games, each a small
+// same-game block of 2-3 legs: a TD scorer, the QB's alt passing yards, a receiver's alt
+// receptions (or rushing/receiving yards), about 10 legs in all.
+const FB_TICKETS = 3;
+const FB_MAX_LEGS = 10;
+const FB_KINDS = [
+  (c) => c.tdPick,
+  (c) => c.ladder && c.statKey === "passingYards",
+  (c) => c.ladder && ["receptions", "receivingYards", "rushingYards", "rushRec"].includes(c.statKey),
+];
+const fbScore = (c) => (c.tdPick ? rate(c.allHits, c.n) * 2.2 : ladderScore(c));
+
+function footballPlus(cands) {
+  const byGame = {};
+  cands.filter((c) => c.tdPick || c.ladder).forEach((c) => (byGame[c.gameId] ||= []).push(c));
+  const used = new Set();
+  const tickets = [];
+  for (let t = 0; t < FB_TICKETS; t++) {
+    const blocks = [];
+    for (const legs of Object.values(byGame)) {
+      const block = [];
+      for (const kind of FB_KINDS) {
+        const c = legs.filter((x) => kind(x) && !used.has(x.id) && playerOk(block, x)).sort((a, b) => fbScore(b) - fbScore(a))[0];
+        if (c) block.push(c);
+      }
+      if (block.length >= 2) blocks.push(block);
+    }
+    // strongest games first; stop around 10 legs
+    blocks.sort((a, b) => Math.min(...b.map(fbScore)) - Math.min(...a.map(fbScore)));
+    const pick = [];
+    let n = 0;
+    for (const b of blocks) {
+      if (n + b.length > FB_MAX_LEGS) continue;
+      pick.push(b);
+      n += b.length;
+      if (n >= FB_MAX_LEGS - 1) break;
+    }
+    if (n < 4) break;
+    pick.flat().forEach((c) => used.add(c.id));
+    tickets.push({ blocks: pick, legs: pick.flat(), dec: pick.flat().reduce((d, c) => d * c.dec, 1), kind: "fbplus" });
+  }
+  return tickets;
+}
+
+function renderFootballPlus(header, cands) {
+  const tickets = footballPlus(cands);
+  sheet.ladder = tickets;
+  sheet.autoParlays = null;
+  const leg = (c) => c.tdPick
+    ? `<div class="alt-leg"><b>${c.player}</b> <span class="muted">(${c.team})</span> Anytime TD <span class="leg-odds">${c.odds}</span>
+       <small class="muted"> · scored in ${c.allHits}/${c.n} games · last 5: ${c.l5Hits}/${c.l5n}</small></div>`
+    : ladderLeg(c);
+  $("sheet-body").innerHTML = `${header}
+    <p class="note">Built like your 10-leg SGP+: a few games, each a same-game block of a TD scorer, the QB's alt passing yards and a receiver's alt receptions/yards. TD scorers scored in half or more of their games; yardage and catch lines cleared in 8+ of the last 10. Straight-math payout; FanDuel prices each block its own way.</p>
+    ${tickets.length ? tickets.map((t, i) => `
+      <div class="auto">
+        <div class="auto-head"><b>SGP+ #${i + 1} · ${t.blocks.length} games · ${t.legs.length} legs</b><span class="muted">~${american(t.dec)} · ${money(slip.stake)} → ~${money(slip.stake * t.dec)}</span></div>
+        ${t.blocks.map((b) => `<div class="plus-block"><div class="muted"><small>SGP · ${b[0].away} @ ${b[0].home}</small></div>${b.map(leg).join("")}</div>`).join("")}
+        <button class="btn primary" data-ladder-use="${i}">Add to slip</button>
+      </div>`).join("") : `<p class="status">Not enough football props posted yet. College props usually show up a day or so before kickoff.</p>`}`;
+}
