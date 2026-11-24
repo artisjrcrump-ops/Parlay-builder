@@ -194,7 +194,7 @@ function renderSlip() {
       <button class="leg-toggle" data-toggle-leg="${l.id}" aria-label="Include leg">${l.on ? "✓" : ""}</button>
       <div class="leg-main">
         <div><button class="copy-name" data-copy-leg="${l.id}"><b>${l.player}</b> ${legText(l)} ⧉</button></div>
-        <small>${legWhen(l)}${l.team} vs ${l.opp} · ${l.est != null ? `est ${l.est} · ` : ""}L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
+        <small>${legWhen(l)}${l.team} vs ${l.opp} · ${typeof GAME_WX !== "undefined" && GAME_WX[l.gameId] ? `${GAME_WX[l.gameId]} · ` : ""}${l.est != null ? `est ${l.est} · ` : ""}L5 ${l.l5} · season ${l.season}${l.group ? ` · ${l.group}` : ""}</small>
       </div>
       <span class="leg-odds">${l.priceSource === "FanDuel (screenshot)" ? "📷 " : /estimat/i.test(l.priceSource || l.source || "") ? "~" : ""}${l.odds}</span>
       <button class="leg-x" data-remove-leg="${l.id}" aria-label="Remove leg">✕</button>

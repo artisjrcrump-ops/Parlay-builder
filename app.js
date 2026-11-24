@@ -107,6 +107,36 @@ function parseOdds(comp) {
   };
 }
 
+// Football conditions: dome, rain/snow/cold from ESPN's forecast, and high-altitude stadiums.
+// GAME_WX[gameId] = short label shown on game cards, football parlays and slip legs.
+const GAME_WX = {};
+const ALTITUDE = { // feet; stadiums high enough to matter (thin air: visitors tire, kicks carry)
+  denver: 5280, boulder: 5360, "fort collins": 5000, "colorado springs": 6620, "usaf academy": 6620,
+  "air force academy": 6620, laramie: 7220, albuquerque: 5100, "salt lake city": 4650, provo: 4550,
+  logan: 4700, reno: 4500, "mexico city": 7350, "el paso": 3700, lubbock: 3250, "las cruces": 3900,
+};
+function gameConditions(ev, comp) {
+  const v = comp.venue || {};
+  const city = (v.address?.city || "").toLowerCase();
+  const out = [];
+  if (v.indoor) {
+    out.push("🏟️ Dome game");
+  } else {
+    const w = ev.weather || comp.weather;
+    const sky = (w?.displayValue || "").toLowerCase();
+    const temp = w?.temperature ?? w?.highTemperature;
+    if (/snow|flurr|sleet|ice|wintry/.test(sky)) out.push(`❄️ Snow${temp != null ? ` · ${temp}°` : ""}`);
+    else if (/rain|shower|storm|drizzle|thunder/.test(sky)) out.push(`🌧️ Rain${temp != null ? ` · ${temp}°` : ""}`);
+    else if (temp != null && temp <= 32) out.push(`🥶 Freezing · ${temp}°`);
+    else if (temp != null && temp <= 40) out.push(`🧊 Cold · ${temp}°`);
+    else if (w) out.push(`${w.displayValue || "Outdoors"}${temp != null ? ` · ${temp}°` : ""}`);
+    if (/wind/.test(sky)) out.push("💨 Windy");
+  }
+  const ft = ALTITUDE[city];
+  if (ft && ft >= 4500) out.push(`⛰️ Altitude ${ft.toLocaleString()} ft`);
+  return out.join(" · ");
+}
+
 function parseGame(ev, ranks) {
   const comp = ev.competitions[0];
   const side = (ha) => {
@@ -125,8 +155,12 @@ function parseGame(ev, ranks) {
     };
   };
   const st = comp.status.type;
+  const football = ["nfl", "ncaaf"].includes(state.league); // callers set state.league to the game's league
+  const wx = football ? gameConditions(ev, comp) : "";
+  if (wx) GAME_WX[ev.id] = wx;
   return {
     id: ev.id,
+    wx,
     date: new Date(ev.date),
     away: side("away"),
     home: side("home"),
@@ -174,6 +208,7 @@ function gameCard(g) {
       ${teamRow(g.away, g)}
       ${teamRow(g.home, g)}
       ${oddsRow(g.odds)}
+      ${g.wx ? `<div class="wx">${g.wx}</div>` : ""}
     </article>`;
 }
 

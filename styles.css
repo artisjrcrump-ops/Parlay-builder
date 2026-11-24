@@ -554,3 +554,5 @@ body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 .real-price input#real-odds { width: 110px; margin-left: 6px; }
 .shot-btn { display: inline-block; margin-top: 6px; cursor: pointer; }
 .foul-trouble { color: #f5a524; font-weight: 600; }
+.wx { font-size: 0.8rem; color: var(--muted, #9aa4b2); margin-top: 6px; }
+.auto-head .wx { font-weight: 400; }

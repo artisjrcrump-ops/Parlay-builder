@@ -83,11 +83,11 @@ function perGameTickets(cands) {
   return tickets;
 }
 
-function ladderLeg(c) {
+function ladderLeg(c, showWx = false) {
   const name = c.line === c.postedLine ? `Over ${c.line} ${c.stat}` : `${c.thr}+ ${c.stat}`;
   const src = c.source === "estimated" ? "~" : "";
   return `<div class="alt-leg"><b>${c.player}</b> <span class="muted">(${c.team})</span> ${name} <span class="leg-odds">${src}${c.odds}</span>
-    <small class="muted"> · last 10: ${c.l10Hits}/${c.l10n} · last 5: ${c.l5Hits}/${c.l5n}${c.matchup ? " · 🔥 soft D" : ""}</small></div>`;
+    <small class="muted"> · last 10: ${c.l10Hits}/${c.l10n}${showWx && GAME_WX[c.gameId] ? ` · ${GAME_WX[c.gameId]}` : ""} · last 5: ${c.l5Hits}/${c.l5n}${c.matchup ? " · 🔥 soft D" : ""}</small></div>`;
 }
 
 function renderLadder(header, cands, mode) {
@@ -104,8 +104,8 @@ function renderLadder(header, cands, mode) {
       const title = t.kind === "sgp" ? `${g.sport ? `${g.sport} · ` : ""}${g.away} @ ${g.home} · ${t.legs.length} legs` : `Ticket #${i + 1} · ${t.legs.length} games`;
       return `
       <div class="auto">
-        <div class="auto-head"><b>${title}</b><span class="muted">~${american(t.dec)} · ${money(slip.stake)} → ~${money(slip.stake * t.dec)}</span></div>
-        ${t.legs.map(ladderLeg).join("")}
+        <div class="auto-head"><b>${title}${t.kind === "sgp" && GAME_WX[g.gameId] ? `<br><small class="wx">${GAME_WX[g.gameId]}</small>` : ""}</b><span class="muted">~${american(t.dec)} · ${money(slip.stake)} → ~${money(slip.stake * t.dec)}</span></div>
+        ${t.legs.map((c) => ladderLeg(c, t.kind === "multi")).join("")}
         <button class="btn primary" data-ladder-use="${i}">Add to slip</button>
       </div>`;
     }).join("") : `<p class="status">Not enough safe X+ lines on this slate yet. Props often post a few hours before tip-off.</p>`}`;
@@ -179,11 +179,11 @@ function renderFootballPlus(header, cands) {
        <small class="muted"> · scored in ${c.allHits}/${c.n} games · last 5: ${c.l5Hits}/${c.l5n}</small></div>`
     : ladderLeg(c);
   $("sheet-body").innerHTML = `${header}
-    <p class="note">Built like your 10-leg SGP+: a few games, each a same-game block of a TD scorer, the QB's alt passing yards and a receiver's alt receptions/yards. TD scorers scored in half or more of their games; yardage and catch lines cleared in 8+ of the last 10. Straight-math payout; FanDuel prices each block its own way.</p>
+    <p class="note">Built like your 10-leg SGP+: a few games, each a same-game block of a TD scorer, the QB's alt passing yards and a receiver's alt receptions/yards. TD scorers scored in half or more of their games; yardage and catch lines cleared in 8+ of the last 10. Straight-math payout; FanDuel prices each block its own way. Each game shows 🏟️ dome, 🌧️ rain, ❄️ snow, 🥶 cold, or ⛰️ altitude when it applies (weather is ESPN’s forecast).
     ${tickets.length ? tickets.map((t, i) => `
       <div class="auto">
         <div class="auto-head"><b>SGP+ #${i + 1} · ${t.blocks.length} games · ${t.legs.length} legs</b><span class="muted">~${american(t.dec)} · ${money(slip.stake)} → ~${money(slip.stake * t.dec)}</span></div>
-        ${t.blocks.map((b) => `<div class="plus-block"><div class="muted"><small>SGP · ${b[0].away} @ ${b[0].home}</small></div>${b.map(leg).join("")}</div>`).join("")}
+        ${t.blocks.map((b) => `<div class="plus-block"><div class="muted"><small>SGP · ${b[0].away} @ ${b[0].home}${GAME_WX[b[0].gameId] ? ` · ${GAME_WX[b[0].gameId]}` : ""}</small></div>${b.map(leg).join("")}</div>`).join("")}
         <button class="btn primary" data-ladder-use="${i}">Add to slip</button>
       </div>`).join("") : `<p class="status">Not enough football props posted yet. College props usually show up a day or so before kickoff.</p>`}`;
 }
